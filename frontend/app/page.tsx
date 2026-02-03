@@ -6,9 +6,9 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Header */}
-      <header className="bg-black px-6 py-4 flex items-center justify-between mt-4 mx-4 rounded-lg">
+      <header className="bg-blue-600 px-6 py-4 flex items-center justify-between mt-4 mx-4 rounded-lg">
         <div className="flex items-center gap-2">
-          <Image src="/logo.png" alt="Glow Saloon" width={150} height={40} className="object-contain" />
+          <Image src="/logo.png" alt="Veer Salon" width={150} height={40} className="object-contain" />
         </div>
         <button className="p-2 text-white hover:bg-gray-800 rounded-lg">
           <svg

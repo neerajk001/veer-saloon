@@ -6,7 +6,7 @@ import AuthProvider from '@/components/AuthProvider'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'GlowSalon - Book Your Appointment',
+  title: 'Veer Salon - Book Your Appointment',
   description: 'Instant salon booking system',
 }
 

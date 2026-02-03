@@ -52,9 +52,9 @@ function LoginLogic() {
             {/* Logo/Brand */}
             <div className="text-center mb-8">
                 <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl shadow-2xl mb-4">
-                    <span className="text-3xl font-bold text-white">GS</span>
+                    <span className="text-3xl font-bold text-white">VS</span>
                 </div>
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">GlowSalon Admin</h1>
+                <h1 className="text-3xl font-bold text-gray-900 mb-2">Veer Salon Admin</h1>
                 <p className="text-gray-600">Sign in to access the admin panel</p>
             </div>
 

@@ -7,7 +7,7 @@ export default function Footer() {
 
                 {/* Left: Brand & Copyright */}
                 <div className="flex items-center gap-3">
-                    <h3 className="text-white font-bold tracking-wide">Veer Saloon</h3>
+                    <h3 className="text-white font-bold tracking-wide">Veer Salon</h3>
                     <span className="hidden md:block text-gray-600">|</span>
                     <p className="text-gray-500">
                         © {new Date().getFullYear()}
