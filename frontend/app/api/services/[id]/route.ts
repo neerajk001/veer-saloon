@@ -7,7 +7,7 @@ import Service from '@/models/Service';
 export const revalidate = 2592000; // Cache for 30 days
 
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
         const { id } = await params;
         if (!id) return NextResponse.json({ message: "Service id is required" }, { status: 400 });
@@ -23,7 +23,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
 }
 
 
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
         const { id } = await params;
         if (!id) return NextResponse.json({ message: "Service id is required" }, { status: 400 });
@@ -38,7 +38,7 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
     }
 }
 
-export async function PUT(req: Request, { params }: { params: { id: string } }) {
+export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
         const { id } = await params;
         const body = await req.json();
