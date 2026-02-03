@@ -19,7 +19,7 @@ type SlotItem = {
   available: boolean;
 };
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+const API_URL = "/api";
 
 export default function BookingPage() {
   const router = useRouter();
@@ -43,7 +43,25 @@ export default function BookingPage() {
   useEffect(() => {
     fetchServices();
     generateDates();
+
+    // Load cached user details
+    const cachedDetails = localStorage.getItem('veer_user_details');
+    if (cachedDetails) {
+      try {
+        setDetails(JSON.parse(cachedDetails));
+      } catch (e) {
+        console.error("Failed to parse user details", e);
+      }
+    }
   }, []);
+
+  // Cache user details whenever they change
+  useEffect(() => {
+    if (details.name || details.phone) {
+      localStorage.setItem('veer_user_details', JSON.stringify(details));
+    }
+  }, [details]);
+
 
   const fetchServices = async () => {
     try {

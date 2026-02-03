@@ -1,5 +1,4 @@
-import { Schema } from "mongoose";
-import mongoose from "mongoose";
+import mongoose, { Schema } from "mongoose";
 
 const appointmentSchema = new Schema({
     customername: {
@@ -8,7 +7,8 @@ const appointmentSchema = new Schema({
     },
     date: {
         type: Date,
-        required: true
+        required: true,
+        index: true
     },
     serviceId: {
         type: Schema.Types.ObjectId,
@@ -32,9 +32,7 @@ const appointmentSchema = new Schema({
         type: Date,
         required: true
     }
-
-
 }, { timestamps: true });
 
-const Appointment = mongoose.model('Appointment', appointmentSchema);
+const Appointment = mongoose.models.Appointment || mongoose.model('Appointment', appointmentSchema);
 export default Appointment;

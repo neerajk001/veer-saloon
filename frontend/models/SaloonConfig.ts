@@ -1,6 +1,4 @@
-import { Schema } from 'mongoose';
-import mongoose from 'mongoose';
-
+import mongoose, { Schema } from 'mongoose';
 
 const saloonConfigSchema = new Schema({
     morningSlot: {
@@ -34,6 +32,5 @@ const saloonConfigSchema = new Schema({
     }
 }, { timestamps: true });
 
-const SaloonConfig = mongoose.model('SaloonConfig', saloonConfigSchema);
+const SaloonConfig = mongoose.models.SaloonConfig || mongoose.model('SaloonConfig', saloonConfigSchema);
 export default SaloonConfig;
-
