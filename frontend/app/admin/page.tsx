@@ -46,9 +46,11 @@ interface SalonConfig {
 
 interface BlockedSlot {
   _id: string;
-  date: string;
-  startTime: string;
-  endTime: string;
+  startDate: string;
+  endDate: string;
+  startTime?: string;
+  endTime?: string;
+  isFullDay: boolean;
   reason?: string;
 }
 
@@ -83,9 +85,11 @@ export default function AdminPage() {
   // Blocked Slots State
   const [blockedSlots, setBlockedSlots] = useState<BlockedSlot[]>([]);
   const [newBlockedSlot, setNewBlockedSlot] = useState({
-    date: new Date().toISOString().split('T')[0],
+    startDate: new Date().toISOString().split('T')[0],
+    endDate: new Date().toISOString().split('T')[0],
     startTime: '',
     endTime: '',
+    isFullDay: false,
     reason: '',
   });
 
@@ -235,22 +239,15 @@ export default function AdminPage() {
     }
   };
 
-  // ===== BLOCKED SLOTS =====
+  // ===== BLOCKED SLOTS / CLOSURES =====
   const fetchBlockedSlots = async () => {
     try {
       setLoading(true);
-      // Fetch all appointments for today and filter blocked ones
-      // In a real app, you might want a date range picker here
-      const today = new Date().toISOString().split('T')[0];
-      const res = await axios.get(`${API_URL}/appointments`, {
-        params: { date: today },
-      });
-
-      // Filter for blocked status
-      const blocked = (res.data || []).filter((apt: any) => apt.status === 'blocked');
-      setBlockedSlots(blocked);
+      // Fetch closures
+      const res = await axios.get(`${API_URL}/admin/closures`);
+      setBlockedSlots(res.data || []);
     } catch (error: any) {
-      console.error('Error fetching blocked slots:', error);
+      console.error('Error fetching closures:', error);
       setBlockedSlots([]);
     } finally {
       setLoading(false);
@@ -259,32 +256,38 @@ export default function AdminPage() {
 
   const createBlockedSlot = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newBlockedSlot.date || !newBlockedSlot.startTime || !newBlockedSlot.endTime) {
-      showMessage('error', 'Please fill all required fields');
+    if (!newBlockedSlot.startDate) {
+      showMessage('error', 'Please select a start date');
       return;
     }
 
-    // Check if services exist
-    if (!services || services.length === 0) {
-      showMessage('error', 'Please create at least one service first');
+    // Default end date to start date if empty (though state initialization handles this)
+    const finalEndDate = newBlockedSlot.endDate || newBlockedSlot.startDate;
+
+    if (!newBlockedSlot.isFullDay && (!newBlockedSlot.startTime || !newBlockedSlot.endTime)) {
+      showMessage('error', 'Please provide start and end time or select Full Day');
       return;
     }
 
     try {
-      // Create as a special "blocked" appointment
-      const startTimeISO = new Date(`${newBlockedSlot.date}T${newBlockedSlot.startTime}:00`).toISOString();
-
-      await axios.post(`${API_URL}/appointments`, {
-        customername: 'BLOCKED',
-        phoneNumber: 'ADMIN',
-        date: newBlockedSlot.date,
-        serviceId: services[0]._id, // Use first service
-        startTime: startTimeISO,
-        status: 'blocked', // Mark as blocked
+      await axios.post(`${API_URL}/admin/closures`, {
+        startDate: newBlockedSlot.startDate,
+        endDate: finalEndDate,
+        startTime: newBlockedSlot.startTime,
+        endTime: newBlockedSlot.endTime,
+        isFullDay: newBlockedSlot.isFullDay,
+        reason: newBlockedSlot.reason
       });
 
-      showMessage('success', 'Slot blocked successfully');
-      setNewBlockedSlot({ date: '', startTime: '', endTime: '', reason: '' });
+      showMessage('success', 'Closure added successfully');
+      setNewBlockedSlot({
+        startDate: newBlockedSlot.startDate,
+        endDate: newBlockedSlot.startDate,
+        startTime: '',
+        endTime: '',
+        isFullDay: false,
+        reason: ''
+      });
       fetchBlockedSlots();
     } catch (error) {
       console.error('Error blocking slot:', error);
@@ -293,23 +296,30 @@ export default function AdminPage() {
   };
 
   const deleteBlockedSlot = async (id: string) => {
-    if (!window.confirm('Are you sure you want to unblock this slot?')) return;
+    if (!window.confirm('Are you sure you want to remove this closure?')) return;
 
     try {
-      await axios.delete(`${API_URL}/appointments/${id}`);
-      showMessage('success', 'Slot unblocked');
+      await axios.delete(`${API_URL}/admin/closures`, { params: { id } });
+      showMessage('success', 'Closure removed');
       fetchBlockedSlots();
     } catch (error) {
-      console.error('Error deleting blocked slot:', error);
-      showMessage('error', 'Failed to unblock slot');
+      console.error('Error deleting closure:', error);
+      showMessage('error', 'Failed to remove closure');
     }
   };
 
   const formatTime = (dateString: string) => {
-    return new Date(dateString).toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    try {
+      if (dateString.includes('T') || dateString.includes('-') || dateString.length > 5) {
+        return new Date(dateString).toLocaleTimeString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+      }
+      return dateString;
+    } catch (e) {
+      return dateString;
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -414,7 +424,7 @@ export default function AdminPage() {
                   : 'bg-gray-50 text-gray-600 hover:bg-gray-100 hover:text-gray-900 border border-gray-200'
                   }`}
               >
-                {tab === 'blocked' ? 'Blocked Slots' : tab}
+                {tab === 'blocked' ? 'Shop Closures' : tab}
               </button>
             ))}
           </nav>
@@ -444,9 +454,9 @@ export default function AdminPage() {
                 <div className="mt-2 text-xs text-green-400">Successfully done</div>
               </div>
               <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100 hover:shadow-md transition-shadow">
-                <div className="text-sm font-medium text-gray-500 mb-2 uppercase tracking-wide">Blocked Slots</div>
+                <div className="text-sm font-medium text-gray-500 mb-2 uppercase tracking-wide">Closures</div>
                 <div className="text-4xl font-extrabold text-gray-600">{stats.blockedSlots}</div>
-                <div className="mt-2 text-xs text-gray-400">Unavailable times</div>
+                <div className="mt-2 text-xs text-gray-400">Active closure rules</div>
               </div>
             </div>
           </div>
@@ -821,54 +831,85 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* Blocked Slots */}
+        {/* Blocked Slots / Closures */}
         {activeTab === 'blocked' && (
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Blocked Slots</h2>
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">Shop Closure Rules</h2>
 
-            {/* Add Blocked Slot Form */}
+            {/* Add Closure Form */}
             <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100 mb-6 max-w-2xl">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Block a Time Slot</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Add Closure</h3>
               <form onSubmit={createBlockedSlot} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Date</label>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Start Date</label>
                     <input
                       type="date"
-                      value={newBlockedSlot.date}
+                      value={newBlockedSlot.startDate}
                       onChange={(e) =>
-                        setNewBlockedSlot({ ...newBlockedSlot, date: e.target.value })
+                        setNewBlockedSlot({ ...newBlockedSlot, startDate: e.target.value })
                       }
                       className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                      Start Time
-                    </label>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">End Date</label>
                     <input
-                      type="time"
-                      value={newBlockedSlot.startTime}
+                      type="date"
+                      value={newBlockedSlot.endDate}
+                      min={newBlockedSlot.startDate}
                       onChange={(e) =>
-                        setNewBlockedSlot({ ...newBlockedSlot, startTime: e.target.value })
-                      }
-                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                      End Time
-                    </label>
-                    <input
-                      type="time"
-                      value={newBlockedSlot.endTime}
-                      onChange={(e) =>
-                        setNewBlockedSlot({ ...newBlockedSlot, endTime: e.target.value })
+                        setNewBlockedSlot({ ...newBlockedSlot, endDate: e.target.value })
                       }
                       className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                     />
                   </div>
                 </div>
+
+                <div className="flex items-center gap-3 py-2">
+                  <input
+                    type="checkbox"
+                    id="fullDay"
+                    checked={newBlockedSlot.isFullDay}
+                    onChange={(e) => setNewBlockedSlot({ ...newBlockedSlot, isFullDay: e.target.checked })}
+                    className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 border-gray-300"
+                  />
+                  <label htmlFor="fullDay" className="text-sm font-medium text-gray-700 select-none">
+                    Close for the whole day
+                  </label>
+                </div>
+
+                {!newBlockedSlot.isFullDay && (
+                  <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                        Start Time
+                      </label>
+                      <input
+                        type="time"
+                        value={newBlockedSlot.startTime}
+                        onChange={(e) =>
+                          setNewBlockedSlot({ ...newBlockedSlot, startTime: e.target.value })
+                        }
+                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                        End Time
+                      </label>
+                      <input
+                        type="time"
+                        value={newBlockedSlot.endTime}
+                        onChange={(e) =>
+                          setNewBlockedSlot({ ...newBlockedSlot, endTime: e.target.value })
+                        }
+                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                      />
+                    </div>
+                  </div>
+                )}
+
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
                     Reason (optional)
@@ -879,7 +920,7 @@ export default function AdminPage() {
                     onChange={(e) =>
                       setNewBlockedSlot({ ...newBlockedSlot, reason: e.target.value })
                     }
-                    placeholder="e.g., Lunch break, Maintenance"
+                    placeholder="e.g., Public Holiday, Renovation"
                     className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                   />
                 </div>
@@ -887,40 +928,45 @@ export default function AdminPage() {
                   type="submit"
                   className="w-full bg-gray-900 text-white px-6 py-3 rounded-xl hover:bg-black transition-colors font-bold shadow-lg"
                 >
-                  Block Slot
+                  Set Closure
                 </button>
               </form>
             </div>
 
-            {/* Blocked Slots List */}
-            {/* Blocked Slots List - Desktop & Mobile Hybrid */}
+            {/* Lists */}
             <div className="mt-8 space-y-4">
               {loading ? (
-                <div className="p-8 text-center text-gray-500">Loading blocked slots...</div>
+                <div className="p-8 text-center text-gray-500">Loading closures...</div>
               ) : blockedSlots.length === 0 ? (
-                <div className="p-8 text-center text-gray-500 bg-white rounded-2xl border border-gray-100">No blocked slots found</div>
+                <div className="p-8 text-center text-gray-500 bg-white rounded-2xl border border-gray-100">No active closure rules</div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {blockedSlots.map((slot) => (
                     <div key={slot._id} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center group hover:shadow-md transition-shadow">
                       <div>
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs font-bold px-2 py-0.5 rounded bg-gray-100 text-gray-600 uppercase">
-                            {new Date(slot.date).toLocaleDateString()}
+                          <span className="text-xs font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-800 uppercase">
+                            {new Date(slot.startDate).toLocaleDateString()}
+                            {slot.startDate !== slot.endDate && ` - ${new Date(slot.endDate).toLocaleDateString()}`}
                           </span>
                         </div>
                         <div className="text-lg font-bold text-gray-900">
-                          {formatTime(slot.startTime)} - {formatTime(slot.endTime)}
+                          {slot.isFullDay ? (
+                            <span className="text-red-600">Full Day Closed</span>
+                          ) : (
+                            <span>{new Date(`2000-01-01T${slot.startTime}`).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date(`2000-01-01T${slot.endTime}`).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                          )}
                         </div>
-                        <div className="text-sm text-red-500 font-medium flex items-center gap-1 mt-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
-                          Blocked by Admin
-                        </div>
+                        {slot.reason && (
+                          <div className="text-sm text-gray-500 font-medium mt-1">
+                            {slot.reason}
+                          </div>
+                        )}
                       </div>
                       <button
                         onClick={() => deleteBlockedSlot(slot._id)}
                         className="p-3 text-red-500 bg-red-50 hover:bg-red-100 rounded-xl transition-colors active:scale-95"
-                        title="Unblock Slot"
+                        title="Remove Closure"
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
                       </button>

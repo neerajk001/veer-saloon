@@ -32,6 +32,8 @@ export default function BookingPage() {
   const [services, setServices] = useState<Service[]>([]);
   const [dates, setDates] = useState<{ day: string; date: string; fullDate: string }[]>([]);
   const [slots, setSlots] = useState<SlotItem[]>([]);
+  const [closureReason, setClosureReason] = useState<string>("");
+  const [activeClosure, setActiveClosure] = useState<any>(null);
 
   // Selection State
   const [selectedService, setSelectedService] = useState<Service | null>(null);
@@ -43,6 +45,7 @@ export default function BookingPage() {
   useEffect(() => {
     fetchServices();
     generateDates();
+    checkShopStatus();
 
     // Load cached user details
     const cachedDetails = localStorage.getItem('veer_user_details');
@@ -76,6 +79,31 @@ export default function BookingPage() {
     }
   };
 
+  const checkShopStatus = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/admin/closures`);
+      const closures = res.data;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      // Find a FULL DAY closure that covers TODAY
+      const currentClosure = closures.find((c: any) => {
+        if (!c.isFullDay) return false;
+        const start = new Date(c.startDate);
+        const end = new Date(c.endDate);
+        start.setHours(0, 0, 0, 0);
+        end.setHours(23, 59, 59, 999); // ensure end of day covers
+        return today >= start && today <= end;
+      });
+
+      if (currentClosure) {
+        setActiveClosure(currentClosure);
+      }
+    } catch (err) {
+      console.error("Failed to check shop status", err);
+    }
+  };
+
   const generateDates = () => {
     const today = new Date();
     const dateList = [];
@@ -105,6 +133,7 @@ export default function BookingPage() {
     if (!selectedService || !selectedDate) return;
     try {
       setSlots([]);
+      setClosureReason("");
       setLoadingSlots(true);
       setSelectedSlot(null); // Reset selected slot when fetching new slots
       const res = await axios.get(`${API_URL}/appointments/slots`, {
@@ -113,6 +142,11 @@ export default function BookingPage() {
           serviceId: selectedService._id,
         },
       });
+
+      if (res.data.reason) {
+        setClosureReason(res.data.reason);
+      }
+
       setSlots(res.data.allSlots || []);
     } catch (err) {
       console.error("Failed to fetch slots", err);
@@ -200,6 +234,31 @@ export default function BookingPage() {
 
   // Check if form is complete
   const isFormComplete = selectedService && selectedSlot && details.name.trim() && details.phone.trim();
+
+  if (activeClosure) {
+    return (
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-500">
+        <div className="w-24 h-24 bg-red-50 rounded-full flex items-center justify-center mb-6">
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-12 h-12 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" /></svg>
+        </div>
+        <h2 className="text-3xl font-bold text-gray-900 mb-4">We Are Currently Closed</h2>
+        <div className="bg-gray-50 p-6 rounded-2xl max-w-md w-full border border-gray-100">
+          <p className="text-gray-600 mb-2">We are closed from</p>
+          <p className="text-xl font-bold text-gray-900 mb-4">
+            {new Date(activeClosure.startDate).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} — {new Date(activeClosure.endDate).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+          </p>
+          {activeClosure.reason && (
+            <div className="inline-block bg-white px-4 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-700">
+              Reason: {activeClosure.reason}
+            </div>
+          )}
+        </div>
+        <Link href="/" className="mt-8 px-8 py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition-colors">
+          Return Home
+        </Link>
+      </div>
+    );
+  }
 
   if (success) {
     return (
@@ -338,6 +397,14 @@ export default function BookingPage() {
             <div className="flex items-center justify-center py-8">
               <div className="w-6 h-6 border-3 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
               <span className="ml-3 text-gray-500">Loading available times...</span>
+            </div>
+          ) : closureReason ? (
+            <div className="bg-red-50 rounded-xl p-6 text-center text-red-600 border border-red-100 flex flex-col items-center justify-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 opacity-75" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" /></svg>
+              <div>
+                <div className="font-bold">Not Available</div>
+                <div className="text-sm opacity-90">{closureReason}</div>
+              </div>
             </div>
           ) : slots.length === 0 ? (
             <div className="bg-gray-100 rounded-xl p-6 text-center text-gray-500">
