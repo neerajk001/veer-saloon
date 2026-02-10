@@ -54,9 +54,18 @@ interface BlockedSlot {
   reason?: string;
 }
 
+interface User {
+  _id: string;
+  name: string;
+  email: string;
+  role: string;
+  blocked: boolean;
+  createdAt: string;
+}
+
 export default function AdminPage() {
   const { data: session } = useSession();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'services' | 'appointments' | 'settings' | 'blocked'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'services' | 'appointments' | 'settings' | 'blocked' | 'users'>('dashboard');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -93,11 +102,44 @@ export default function AdminPage() {
     reason: '',
   });
 
+  // Users State
+  const [users, setUsers] = useState<User[]>([]);
+
   // Show message helper
   const showMessage = (type: 'success' | 'error', text: string) => {
     setMessage({ type, text });
     setTimeout(() => setMessage(null), 3000);
   };
+
+  // Redirect if not admin
+  useEffect(() => {
+    if (session?.user) {
+      const isAdmin = (session.user as any).role === 'admin' ||
+        ['ganesh404veer@gmail.com', 'neerajkushwaha0401@gmail.com'].includes(session.user.email?.toLowerCase() || '');
+
+      if (!isAdmin) {
+        // Optional: Redirect to home or show error
+        // router.push('/'); // Need to import useRouter
+      }
+    }
+  }, [session]);
+
+  const isAdmin = (session?.user as any)?.role === 'admin' ||
+    ['ganesh404veer@gmail.com', 'neerajkushwaha0401@gmail.com'].includes(session?.user?.email?.toLowerCase() || '');
+
+  if (session && !isAdmin) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-4">
+        <div className="bg-red-50 text-red-800 p-6 rounded-2xl max-w-md text-center">
+          <h2 className="text-2xl font-bold mb-2">Access Denied</h2>
+          <p>You do not have permission to view the admin dashboard.</p>
+          <Link href="/" className="inline-block mt-4 px-6 py-2 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700">
+            Return Home
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   // Fetch data on tab change
   useEffect(() => {
@@ -105,6 +147,7 @@ export default function AdminPage() {
     if (activeTab === 'appointments') fetchAppointments();
     if (activeTab === 'settings') fetchConfig();
     if (activeTab === 'blocked') fetchBlockedSlots();
+    if (activeTab === 'users') fetchUsers();
   }, [activeTab, selectedDate]);
 
   // ===== SERVICES =====
@@ -308,6 +351,40 @@ export default function AdminPage() {
     }
   };
 
+  // ===== USERS =====
+  const fetchUsers = async () => {
+    // Safety check
+    const isAdmin = (session?.user as any)?.role === 'admin' ||
+      ['ganesh404veer@gmail.com', 'neerajkushwaha0401@gmail.com'].includes(session?.user?.email?.toLowerCase() || '');
+
+    if (!isAdmin) return;
+
+    try {
+      setLoading(true);
+      const res = await axios.get(`${API_URL}/admin/users`);
+      setUsers(res.data || []);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      showMessage('error', 'Failed to load users');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleBlockUser = async (userId: string, currentStatus: boolean) => {
+    if (!window.confirm(`Are you sure you want to ${currentStatus ? 'unblock' : 'block'} this user?`)) return;
+
+    try {
+      await axios.put(`${API_URL}/admin/users`, { userId, blocked: !currentStatus });
+      showMessage('success', `User ${currentStatus ? 'unblocked' : 'blocked'} successfully`);
+      // Update local state immediately
+      setUsers(users.map(u => u._id === userId ? { ...u, blocked: !currentStatus } : u));
+    } catch (error) {
+      console.error('Error updating user:', error);
+      showMessage('error', 'Failed to update user status');
+    }
+  };
+
   const formatTime = (dateString: string) => {
     try {
       if (dateString.includes('T') || dateString.includes('-') || dateString.length > 5) {
@@ -342,6 +419,7 @@ export default function AdminPage() {
     todayAppointments: appointments.filter(a => a.status === 'scheduled').length,
     completedToday: appointments.filter(a => a.status === 'completed').length,
     blockedSlots: blockedSlots.length,
+    totalUsers: users.length
   };
 
   return (
@@ -415,18 +493,26 @@ export default function AdminPage() {
       <div className="bg-white border-b border-gray-200 sticky top-[73px] z-20 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <nav className="flex gap-2 overflow-x-auto py-3 no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0">
-            {['dashboard', 'services', 'appointments', 'settings', 'blocked'].map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab as any)}
-                className={`flex-shrink-0 px-5 py-2.5 rounded-full text-sm font-medium capitalize transition-all duration-200 ${activeTab === tab
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-200 transform scale-105'
-                  : 'bg-gray-50 text-gray-600 hover:bg-gray-100 hover:text-gray-900 border border-gray-200'
-                  }`}
-              >
-                {tab === 'blocked' ? 'Shop Closures' : tab}
-              </button>
-            ))}
+            {(() => {
+              const isAdmin = (session?.user as any)?.role === 'admin' ||
+                ['ganesh404veer@gmail.com', 'neerajkushwaha0401@gmail.com'].includes(session?.user?.email?.toLowerCase() || '');
+
+              const tabs = ['dashboard', 'services', 'appointments', 'settings', 'blocked'];
+              if (isAdmin) tabs.push('users');
+
+              return tabs.map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab as any)}
+                  className={`flex-shrink-0 px-5 py-2.5 rounded-full text-sm font-medium capitalize transition-all duration-200 ${activeTab === tab
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-200 transform scale-105'
+                    : 'bg-gray-50 text-gray-600 hover:bg-gray-100 hover:text-gray-900 border border-gray-200'
+                    }`}
+                >
+                  {tab === 'blocked' ? 'Shop Closures' : tab}
+                </button>
+              ));
+            })()}
           </nav>
         </div>
       </div>
@@ -457,6 +543,11 @@ export default function AdminPage() {
                 <div className="text-sm font-medium text-gray-500 mb-2 uppercase tracking-wide">Closures</div>
                 <div className="text-4xl font-extrabold text-gray-600">{stats.blockedSlots}</div>
                 <div className="mt-2 text-xs text-gray-400">Active closure rules</div>
+              </div>
+              <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100 hover:shadow-md transition-shadow">
+                <div className="text-sm font-medium text-gray-500 mb-2 uppercase tracking-wide">Total Users</div>
+                <div className="text-4xl font-extrabold text-indigo-600">{stats.totalUsers}</div>
+                <div className="mt-2 text-xs text-gray-400">Registered customers</div>
               </div>
             </div>
           </div>
@@ -973,6 +1064,129 @@ export default function AdminPage() {
                     </div>
                   ))}
                 </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Users Management */}
+        {activeTab === 'users' && (
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">User Management</h2>
+
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b border-gray-100">
+                  <tr>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">User</th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Role</th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-4 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {users.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="px-6 py-12 text-center text-gray-500">No users found.</td>
+                    </tr>
+                  ) : (
+                    users.map((user) => (
+                      <tr key={user._id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs">
+                              {user.name?.charAt(0).toUpperCase() || 'U'}
+                            </div>
+                            <div>
+                              <div className="text-sm font-medium text-gray-900">{user.name}</div>
+                              <div className="text-xs text-gray-500">{user.email}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`text-xs px-2 py-1 rounded-full font-semibold ${user.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'}`}>
+                            {user.role}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          {user.blocked ? (
+                            <span className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full font-medium flex items-center gap-1 w-fit">
+                              <span className="w-1.5 h-1.5 rounded-full bg-red-600"></span> Blocked
+                            </span>
+                          ) : (
+                            <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full font-medium flex items-center gap-1 w-fit">
+                              <span className="w-1.5 h-1.5 rounded-full bg-green-600"></span> Active
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          {user.role !== 'admin' && (
+                            <button
+                              onClick={() => toggleBlockUser(user._id, user.blocked)}
+                              className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${user.blocked
+                                ? 'bg-green-50 text-green-600 hover:bg-green-100'
+                                : 'bg-red-50 text-red-600 hover:bg-red-100'
+                                }`}
+                            >
+                              {user.blocked ? 'Unblock' : 'Block Access'}
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile User List */}
+            <div className="md:hidden space-y-4 mt-6">
+              {users.length === 0 ? (
+                <div className="text-center text-gray-500">No users found</div>
+              ) : (
+                users.map(user => (
+                  <div key={user._id} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+                    <div className="flex justify-between items-start mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold">
+                          {user.name?.charAt(0).toUpperCase() || 'U'}
+                        </div>
+                        <div>
+                          <div className="font-semibold text-gray-900">{user.name}</div>
+                          <div className="text-xs text-gray-500">{user.email}</div>
+                        </div>
+                      </div>
+                      <span className={`text-xs px-2 py-1 rounded-full font-semibold ${user.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'}`}>
+                        {user.role}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between items-center pt-3 border-t border-gray-100">
+                      <div>
+                        {user.blocked ? (
+                          <span className="text-xs font-medium text-red-600 flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-red-600"></span> Blocked
+                          </span>
+                        ) : (
+                          <span className="text-xs font-medium text-green-600 flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-green-600"></span> Active
+                          </span>
+                        )}
+                      </div>
+                      {user.role !== 'admin' && (
+                        <button
+                          onClick={() => toggleBlockUser(user._id, user.blocked)}
+                          className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${user.blocked
+                            ? 'bg-green-50 text-green-600 hover:bg-green-100'
+                            : 'bg-red-50 text-red-600 hover:bg-red-100'
+                            }`}
+                        >
+                          {user.blocked ? 'Unblock' : 'Block'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))
               )}
             </div>
           </div>

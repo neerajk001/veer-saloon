@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 import dbConnect from '@/lib/mongodb';
 import Appointment from '@/models/Appointment';
 import Service from '@/models/Service';
@@ -7,6 +9,11 @@ import { addMinutesToDate, isOverlapping } from '@/utils/time.utils';
 
 export async function POST(req: Request) {
     try {
+        const session = await getServerSession(authOptions);
+        if (!session) {
+            return NextResponse.json({ message: "Unauthorized. Please sign in to book." }, { status: 401 });
+        }
+
         const body = await req.json();
         const { customername, date, serviceId, phoneNumber, startTime } = body;
 
@@ -51,7 +58,8 @@ export async function POST(req: Request) {
             phoneNumber,
             startTime: start,
             endTime: end,
-            status: body.status || 'scheduled'
+            status: body.status || 'scheduled',
+            userEmail: session.user?.email
         });
 
         await newAppointment.save();

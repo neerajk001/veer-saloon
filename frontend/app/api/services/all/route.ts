@@ -4,7 +4,7 @@ import Service from '@/models/Service';
 
 
 
-export const revalidate = 2592000; // Cache for 30 days
+export const dynamic = 'force-dynamic';
 
 
 export async function GET() {

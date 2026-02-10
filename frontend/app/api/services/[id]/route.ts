@@ -4,7 +4,7 @@ import Service from '@/models/Service';
 
 
 
-export const revalidate = 2592000; // Cache for 30 days
+export const dynamic = 'force-dynamic';
 
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -34,6 +34,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
 
         return NextResponse.json({ message: "Service deleted successfully" });
     } catch (error) {
+        console.error("Error deleting service:", error);
         return NextResponse.json({ message: "Internal server error" }, { status: 500 });
     }
 }
@@ -51,13 +52,14 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         if (!service) return NextResponse.json({ message: "Service not found" }, { status: 404 });
 
         service.name = name || service.name;
-        service.duration = duration || service.duration;
-        service.price = price || service.price;
+        service.duration = duration !== undefined ? duration : service.duration;
+        service.price = price !== undefined ? price : service.price;
         await service.save();
 
         return NextResponse.json({ message: "Service updated successfully", service });
 
     } catch (error) {
+        console.error("Error updating service:", error);
         return NextResponse.json({ message: "Internal server error" }, { status: 500 });
     }
 }

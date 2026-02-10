@@ -19,6 +19,10 @@ const appointmentSchema = new Schema({
         type: String,
         required: true
     },
+    userEmail: {
+        type: String,
+        required: false
+    },
     status: {
         type: String,
         enum: ['scheduled', 'completed', 'canceled', 'blocked'],
