@@ -22,9 +22,9 @@ export async function GET(req: Request) {
         const queryDate = new Date(date);
         const startOfDay = new Date(queryDate.setHours(0, 0, 0, 0));
 
-        // Find any closure that covers this day
+        // Find ALL closures that cover this day
         // Logic: active if (ClosureStart <= QueryDate) AND (ClosureEnd >= QueryDate)
-        const closure = await Closure.findOne({
+        const closures = await Closure.find({
             startDate: { $lte: startOfDay },
             endDate: { $gte: startOfDay }
         });
@@ -46,14 +46,15 @@ export async function GET(req: Request) {
             return NextResponse.json({ message: "Saloon configuration not found" }, { status: 404 });
         }
 
-        // Check if fully closed
-        if (closure && closure.isFullDay) {
+        // Check if fully closed by ANY closure
+        const fullDayClosure = closures.find(c => c.isFullDay);
+        if (fullDayClosure) {
             return NextResponse.json({
                 date,
                 serviceId,
                 availableSlots: [],
                 allSlots: [],
-                reason: closure.reason || "Shop Closed"
+                reason: fullDayClosure.reason || "Shop Closed"
             });
         }
 
@@ -81,14 +82,16 @@ export async function GET(req: Request) {
                 }
             }
 
-            // Check partial closure overlap
-            if (closure && !closure.isFullDay && closure.startTime && closure.endTime) {
-                const closeStart = parseTimeStr(closure.startTime);
-                const closeEnd = parseTimeStr(closure.endTime);
+            // Check partial closure overlaps
+            for (const closure of closures) {
+                if (!closure.isFullDay && closure.startTime && closure.endTime) {
+                    const closeStart = parseTimeStr(closure.startTime);
+                    const closeEnd = parseTimeStr(closure.endTime);
 
-                // If the service slot interferes with the closure time
-                if (isOverlapping(closeStart, closeEnd, slotStart, slotEnd)) {
-                    return false;
+                    // If the service slot interferes with the closure time
+                    if (isOverlapping(closeStart, closeEnd, slotStart, slotEnd)) {
+                        return false;
+                    }
                 }
             }
 

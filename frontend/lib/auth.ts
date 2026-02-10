@@ -47,9 +47,10 @@ export const authOptions: NextAuthOptions = {
 
                 if (!dbUser) {
                     // Create new user
+                    const generatedName = user.name || email.split('@')[0];
                     dbUser = await User.create({
                         email,
-                        name: user.name || "Unknown",
+                        name: generatedName,
                         image: user.image || "",
                         role: isAdmin ? 'admin' : 'user',
                         blocked: false
@@ -59,11 +60,6 @@ export const authOptions: NextAuthOptions = {
                     if (dbUser.blocked) {
                         return false; // Deny access
                     }
-
-                    // Update user info if changed (optional but good practice)
-                    // dbUser.name = user.name || dbUser.name;
-                    // dbUser.image = user.image || dbUser.image;
-                    // await dbUser.save();
                 }
 
                 return true;
@@ -74,17 +70,15 @@ export const authOptions: NextAuthOptions = {
         },
         async session({ session, token }) {
             if (session.user && token.sub) {
-                // We need to fetch the user again or rely on token if we put role there
-                // To keep it fresh, let's fetch from DB or store in token
                 session.user.email = token.email;
-                // Add id and role to session
-                // We can put these in the token in the jwt callback for efficiency
-                // but let's just use what's in the token for now
                 if (token.role) {
                     (session.user as any).role = token.role;
                 }
                 if (token.id) {
                     (session.user as any).id = token.id;
+                }
+                if (token.name) {
+                    session.user.name = token.name;
                 }
             }
             return session;
@@ -96,7 +90,6 @@ export const authOptions: NextAuthOptions = {
             }
 
             // Fetch latest user data from DB to ensure role/blocked status is current
-            // This runs on every session check which ensures admin status is fresh
             if (token.email) {
                 await dbConnect();
                 const dbUser = await User.findOne({ email: token.email.toLowerCase() });
@@ -104,6 +97,7 @@ export const authOptions: NextAuthOptions = {
                     token.id = dbUser._id.toString();
                     token.role = dbUser.role;
                     token.blocked = dbUser.blocked;
+                    token.name = dbUser.name;
                 }
             }
             return token;

@@ -309,7 +309,7 @@ export default function BookingPage() {
       <header className="sticky top-0 bg-white/95 backdrop-blur-md z-50 border-b border-gray-100 transition-all">
         <div className="max-w-3xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link href="/" className="group">
-            <Image src="/logo.png" alt="Veer Salon" width={100} height={35} className="object-contain grayscale brightness-0" />
+            <Image src="/logo.png" alt="Veer Salon" width={140} height={50} className="object-contain grayscale brightness-0" />
           </Link>
 
           <div className="flex items-center gap-4">
