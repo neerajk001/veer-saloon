@@ -121,7 +121,8 @@ export default function BookingPage() {
     const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-    for (let i = 0; i < 2; i++) {
+    // Booking open for tomorrow and day after tomorrow only (not today)
+    for (let i = 1; i <= 2; i++) {
       const d = new Date(today);
       d.setDate(today.getDate() + i);
       const dayName = days[d.getDay()];
@@ -158,7 +159,9 @@ export default function BookingPage() {
         setClosureReason(res.data.reason);
       }
 
-      setSlots(res.data.allSlots || []);
+      // Use only available slots so blocked/admin-blocked slots vanish for the user
+      const available = res.data.availableSlots || [];
+      setSlots(available.map((t: string) => ({ time: t, available: true })));
     } catch (err) {
       console.error("Failed to fetch slots", err);
     } finally {

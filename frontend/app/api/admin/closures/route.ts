@@ -36,21 +36,23 @@ export async function POST(req: Request) {
             return NextResponse.json({ message: "End date cannot be before start date" }, { status: 400 });
         }
 
-        // If range > 1 day, it MUST be full day closure for simplicity in this logic
-        // Or we can allow partial functionality, but the user requirement "weeks" usually implies full closure.
-        // Let's enforce full day if days differ, OR allow partial but it implies "Every day from X to Y hours"?
-        // User said: "if the admin wants like they are close... he is able to set... which date they are close and it can be multiple date".
-        // "This timing will be optional like if he only select the date and apply it that whole day booking will close".
-
-        // Interpretation: 
-        // 1. Single Date + Time Range -> Partial Closure on that day.
-        // 2. Single Date + Full Day -> Closed that day.
-        // 3. Multiple Date Range -> "Closed from X to Y". Usually implies Full Day for that period.
-        // Let's assume multi-day range = Full Day Closure.
-
         let finalIsFullDay = isFullDay;
         if (start.getTime() !== end.getTime()) {
-            finalIsFullDay = true; // Force full day for ranges
+            finalIsFullDay = true; // Force full day for multi-day ranges
+        }
+
+        // Validate 5-minute interval for partial closures (HH:mm, minutes in 0,5,10,...,55)
+        const fiveMinRegex = /^([01]?\d|2[0-3]):(00|05|10|15|20|25|30|35|40|45|50|55)$/;
+        if (!finalIsFullDay) {
+            if (!startTime || !endTime) {
+                return NextResponse.json({ message: "Start time and end time are required for partial day closure" }, { status: 400 });
+            }
+            if (!fiveMinRegex.test(startTime) || !fiveMinRegex.test(endTime)) {
+                return NextResponse.json({ message: "Start and end time must be in 5-minute intervals (e.g. 09:00, 09:05)" }, { status: 400 });
+            }
+            if (startTime >= endTime) {
+                return NextResponse.json({ message: "End time must be after start time" }, { status: 400 });
+            }
         }
 
         const closure = await Closure.create({

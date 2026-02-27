@@ -46,6 +46,20 @@ export async function GET(req: Request) {
             return NextResponse.json({ message: "Saloon configuration not found" }, { status: 404 });
         }
 
+        // Check weekly days off (e.g. Sunday, Monday from settings)
+        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const queryDayName = dayNames[new Date(date).getDay()];
+        const daysOff = (config.daysOff || []).map((d: string) => String(d).trim().toLowerCase());
+        if (daysOff.length && daysOff.includes(queryDayName.toLowerCase())) {
+            return NextResponse.json({
+                date,
+                serviceId,
+                availableSlots: [],
+                allSlots: [],
+                reason: `Closed on ${queryDayName}s`
+            });
+        }
+
         // Check if fully closed by ANY closure
         const fullDayClosure = closures.find(c => c.isFullDay);
         if (fullDayClosure) {

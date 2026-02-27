@@ -7,6 +7,17 @@ import { useSession, signOut } from 'next-auth/react';
 
 const API_URL = '/api';
 
+// 5-minute interval time options for block slot (00:00 to 23:55)
+const TIME_OPTIONS_5MIN = (() => {
+  const opts: string[] = [];
+  for (let h = 0; h < 24; h++) {
+    for (let m = 0; m < 60; m += 5) {
+      opts.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+    }
+  }
+  return opts;
+})();
+
 // Types
 interface Service {
   _id: string;
@@ -105,6 +116,11 @@ export default function AdminPage() {
   // Users State
   const [users, setUsers] = useState<User[]>([]);
 
+  // Daily count (backend total for "how many came in a day")
+  const [dailyCount, setDailyCount] = useState<{ date: string; total: number; scheduled: number; completed: number } | null>(null);
+  // Monthly count (month-end sum from backend)
+  const [monthlyCount, setMonthlyCount] = useState<{ date: string; total: number; scheduled: number; completed: number } | null>(null);
+
   // Show message helper
   const showMessage = (type: 'success' | 'error', text: string) => {
     setMessage({ type, text });
@@ -143,12 +159,40 @@ export default function AdminPage() {
 
   // Fetch data on tab change
   useEffect(() => {
+    if (activeTab === 'dashboard') {
+      fetchDailyCount();
+      fetchMonthlyCount();
+    }
     if (activeTab === 'services') fetchServices();
     if (activeTab === 'appointments') fetchAppointments();
     if (activeTab === 'settings') fetchConfig();
     if (activeTab === 'blocked') fetchBlockedSlots();
     if (activeTab === 'users') fetchUsers();
   }, [activeTab, selectedDate]);
+
+  const fetchDailyCount = async () => {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const res = await axios.get(`${API_URL}/appointments/daily-count`, { params: { date: today } });
+      setDailyCount(res.data);
+    } catch (error) {
+      console.error('Error fetching daily count:', error);
+      setDailyCount(null);
+    }
+  };
+
+  const fetchMonthlyCount = async () => {
+    try {
+      const now = new Date();
+      const res = await axios.get(`${API_URL}/appointments/monthly-count`, {
+        params: { year: now.getFullYear(), month: now.getMonth() + 1 },
+      });
+      setMonthlyCount(res.data);
+    } catch (error) {
+      console.error('Error fetching monthly count:', error);
+      setMonthlyCount(null);
+    }
+  };
 
   // ===== SERVICES =====
   const fetchServices = async () => {
@@ -225,7 +269,7 @@ export default function AdminPage() {
     } catch (error: any) {
       // If endpoint doesn't exist (404), create it as a workaround using direct DB update
       if (error.response?.status === 404) {
-        showMessage('error', 'Update endpoint not implemented. Please add PUT /appointments/:id to backend');
+        showMessage('error', 'Failed to update appointment. Please try again.');
       } else {
         console.error('Error updating appointment:', error);
         showMessage('error', 'Failed to update appointment');
@@ -416,8 +460,10 @@ export default function AdminPage() {
 
   const stats = {
     totalServices: services.length,
-    todayAppointments: appointments.filter(a => a.status === 'scheduled').length,
-    completedToday: appointments.filter(a => a.status === 'completed').length,
+    // Use backend daily count when available (dashboard loads first); else fallback to appointments list
+    todayAppointments: dailyCount ? dailyCount.scheduled : appointments.filter(a => a.status === 'scheduled').length,
+    completedToday: dailyCount ? dailyCount.completed : appointments.filter(a => a.status === 'completed').length,
+    customersToday: dailyCount ? dailyCount.total : appointments.filter(a => a.status !== 'canceled').length,
     blockedSlots: blockedSlots.length,
     totalUsers: users.length
   };
@@ -525,19 +571,29 @@ export default function AdminPage() {
             <h2 className="text-2xl font-bold text-gray-900 mb-6 tracking-tight">Dashboard Overview</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100 hover:shadow-md transition-shadow">
+                <div className="text-sm font-medium text-gray-500 mb-2 uppercase tracking-wide">Customers today</div>
+                <div className="text-4xl font-extrabold text-amber-600">{stats.customersToday}</div>
+                <div className="mt-2 text-xs text-amber-500">Total came in today (backend)</div>
+              </div>
+              <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100 hover:shadow-md transition-shadow">
+                <div className="text-sm font-medium text-gray-500 mb-2 uppercase tracking-wide">This month (total)</div>
+                <div className="text-4xl font-extrabold text-violet-600">{monthlyCount?.total ?? '–'}</div>
+                <div className="mt-2 text-xs text-violet-500">Month sum – all customers (backend)</div>
+              </div>
+              <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100 hover:shadow-md transition-shadow">
                 <div className="text-sm font-medium text-gray-500 mb-2 uppercase tracking-wide">Total Services</div>
                 <div className="text-4xl font-extrabold text-gray-900">{stats.totalServices}</div>
                 <div className="mt-2 text-xs text-gray-400">Active services offered</div>
               </div>
               <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100 hover:shadow-md transition-shadow">
-                <div className="text-sm font-medium text-gray-500 mb-2 uppercase tracking-wide">Today's Appointments</div>
+                <div className="text-sm font-medium text-gray-500 mb-2 uppercase tracking-wide">Today&apos;s Appointments</div>
                 <div className="text-4xl font-extrabold text-blue-600">{stats.todayAppointments}</div>
                 <div className="mt-2 text-xs text-blue-400">Scheduled for today</div>
               </div>
               <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100 hover:shadow-md transition-shadow">
                 <div className="text-sm font-medium text-gray-500 mb-2 uppercase tracking-wide">Completed</div>
                 <div className="text-4xl font-extrabold text-green-600">{stats.completedToday}</div>
-                <div className="mt-2 text-xs text-green-400">Successfully done</div>
+                <div className="mt-2 text-xs text-green-400">Successfully done today</div>
               </div>
               <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100 hover:shadow-md transition-shadow">
                 <div className="text-sm font-medium text-gray-500 mb-2 uppercase tracking-wide">Closures</div>
@@ -974,29 +1030,39 @@ export default function AdminPage() {
                   <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
                     <div>
                       <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                        Start Time
+                        Start Time (5-min steps)
                       </label>
-                      <input
-                        type="time"
+                      <select
                         value={newBlockedSlot.startTime}
-                        onChange={(e) =>
-                          setNewBlockedSlot({ ...newBlockedSlot, startTime: e.target.value })
-                        }
+                        onChange={(e) => {
+                          const start = e.target.value;
+                          const end = newBlockedSlot.endTime && start && newBlockedSlot.endTime <= start ? '' : newBlockedSlot.endTime;
+                          setNewBlockedSlot({ ...newBlockedSlot, startTime: start, endTime: end });
+                        }}
                         className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-                      />
+                      >
+                        <option value="">Select start</option>
+                        {TIME_OPTIONS_5MIN.map((t) => (
+                          <option key={t} value={t}>{t}</option>
+                        ))}
+                      </select>
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                        End Time
+                        End Time (5-min steps)
                       </label>
-                      <input
-                        type="time"
+                      <select
                         value={newBlockedSlot.endTime}
                         onChange={(e) =>
                           setNewBlockedSlot({ ...newBlockedSlot, endTime: e.target.value })
                         }
                         className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-                      />
+                      >
+                        <option value="">Select end</option>
+                        {TIME_OPTIONS_5MIN.filter((t) => !newBlockedSlot.startTime || t > newBlockedSlot.startTime).map((t) => (
+                          <option key={t} value={t}>{t}</option>
+                        ))}
+                      </select>
                     </div>
                   </div>
                 )}
