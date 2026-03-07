@@ -25,14 +25,20 @@ export async function POST(req: Request) {
             return NextResponse.json({ message: "Start and End dates are required" }, { status: 400 });
         }
 
-        const start = new Date(startDate);
-        const end = new Date(endDate);
+        let start: Date;
+        let end: Date;
+        // Use UTC midnight for same-day so slots API finds closures consistently
+        if (startDate === endDate) {
+            start = new Date(startDate + 'T00:00:00.000Z');
+            end = new Date(startDate + 'T00:00:00.000Z');
+        } else {
+            start = new Date(startDate);
+            end = new Date(endDate);
+            start.setHours(0, 0, 0, 0);
+            end.setHours(0, 0, 0, 0);
+        }
 
-        // Reset times to midnight for date comparison consistency
-        start.setHours(0, 0, 0, 0);
-        end.setHours(0, 0, 0, 0);
-
-        if (end < start) {
+        if (end.getTime() < start.getTime()) {
             return NextResponse.json({ message: "End date cannot be before start date" }, { status: 400 });
         }
 

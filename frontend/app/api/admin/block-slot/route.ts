@@ -33,13 +33,11 @@ export async function POST(req: Request) {
             return NextResponse.json({ message: 'End time must be after start time' }, { status: 400 });
         }
 
-        const dayStart = new Date(date);
+        // Use UTC midnight for the calendar day so closure is found consistently in slots API
+        const dayStart = new Date(date + 'T00:00:00.000Z');
         if (isNaN(dayStart.getTime())) {
             return NextResponse.json({ message: 'Invalid date' }, { status: 400 });
         }
-        dayStart.setHours(0, 0, 0, 0);
-        const dayEnd = new Date(dayStart);
-        dayEnd.setDate(dayEnd.getDate() + 1);
 
         const closure = await Closure.create({
             startDate: dayStart,

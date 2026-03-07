@@ -18,14 +18,13 @@ export async function GET(req: Request) {
 
         await dbConnect();
 
-        // Normalize date to start of day for accurate querying
-        const queryDate = new Date(date);
-        const startOfDay = new Date(queryDate.setHours(0, 0, 0, 0));
+        // Use UTC midnight for calendar day so we match closures stored by block-slot
+        const startOfDay = new Date(date + 'T00:00:00.000Z');
+        const endOfDay = new Date(date + 'T23:59:59.999Z');
 
-        // Find ALL closures that cover this day
-        // Logic: active if (ClosureStart <= QueryDate) AND (ClosureEnd >= QueryDate)
+        // Find closures that overlap this day (works for UTC or local-time stored dates)
         const closures = await Closure.find({
-            startDate: { $lte: startOfDay },
+            startDate: { $lte: endOfDay },
             endDate: { $gte: startOfDay }
         });
 
@@ -33,7 +32,7 @@ export async function GET(req: Request) {
             Service.findById(serviceId),
             SaloonConfig.findOne(),
             Appointment.find({
-                date: { $gte: startOfDay, $lte: new Date(queryDate.setHours(23, 59, 59, 999)) },
+                date: { $gte: startOfDay, $lte: endOfDay },
                 status: { $in: ["scheduled", "blocked"] }
             })
         ]);
@@ -78,13 +77,9 @@ export async function GET(req: Request) {
         const allSlots: Array<{ time: Date; available: boolean }> = [];
         const slots: Date[] = [];
 
-        // Helper to parse "HH:mm" to Date for the current day
-        const parseTimeStr = (timeStr: string) => {
-            const [hours, minutes] = timeStr.split(':').map(Number);
-            const d = new Date(date);
-            d.setHours(hours, minutes, 0, 0);
-            return d;
-        };
+        // Parse "HH:mm" in same timezone as slot generation (+05:30) so overlap check is correct
+        const timeZoneOffset = "+05:30";
+        const parseTimeStr = (timeStr: string) => new Date(`${date}T${timeStr}:00${timeZoneOffset}`);
 
         const canFitService = (slotStart: Date): boolean => {
             const slotEnd = addMinutesToDate(slotStart, slotDuration);
