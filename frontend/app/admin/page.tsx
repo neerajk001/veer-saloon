@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import Link from 'next/link';
 import { useSession, signOut } from 'next-auth/react';
@@ -17,6 +17,75 @@ const TIME_OPTIONS_5MIN = (() => {
   }
   return opts;
 })();
+
+// Display time in 12-hour format (e.g. "13:00" -> "1:00 PM")
+function formatTimeOption24to12(hhmm: string): string {
+  const [hStr, mStr] = hhmm.split(':');
+  const h = parseInt(hStr, 10);
+  const m = parseInt(mStr || '0', 10);
+  const hour12 = h % 12 || 12;
+  const ampm = h < 12 ? 'AM' : 'PM';
+  return `${hour12}:${String(m).padStart(2, '0')} ${ampm}`;
+}
+
+// Scrollable time dropdown so it doesn't overflow the screen on mobile
+function TimeSelect({
+  value,
+  onChange,
+  options,
+  placeholder,
+  className = '',
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: string[];
+  placeholder: string;
+  className?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    if (open) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [open]);
+  const display = value ? formatTimeOption24to12(value) : placeholder;
+  return (
+    <div ref={ref} className={`relative ${className}`}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none bg-white text-left flex items-center justify-between"
+      >
+        <span className={value ? 'text-gray-900' : 'text-gray-500'}>{display}</span>
+        <svg className="w-4 h-4 text-gray-400 flex-shrink-0 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+      </button>
+      {open && (
+        <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+          <div className="max-h-[min(50vh,280px)] overflow-y-auto overscroll-contain touch-pan-y" style={{ WebkitOverflowScrolling: 'touch' }}>
+            {options.map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => {
+                  onChange(t);
+                  setOpen(false);
+                }}
+                className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 active:bg-gray-100 block ${value === t ? 'bg-amber-50 text-amber-800 font-medium' : 'text-gray-900'}`}
+              >
+                {formatTimeOption24to12(t)}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // Types
 interface Service {
@@ -112,6 +181,14 @@ export default function AdminPage() {
     isFullDay: false,
     reason: '',
   });
+  // Quick block time slot (single day, instant – slots disappear on booking page)
+  const [quickBlockSlot, setQuickBlockSlot] = useState({
+    date: (() => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().split('T')[0]; })(),
+    startTime: '',
+    endTime: '',
+    reason: '',
+  });
+  const [blockingSlot, setBlockingSlot] = useState(false);
 
   // Users State
   const [users, setUsers] = useState<User[]>([]);
@@ -395,6 +472,35 @@ export default function AdminPage() {
     }
   };
 
+  const blockTimeSlotQuick = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickBlockSlot.startTime || !quickBlockSlot.endTime) {
+      showMessage('error', 'Please select start and end time');
+      return;
+    }
+    if (quickBlockSlot.startTime >= quickBlockSlot.endTime) {
+      showMessage('error', 'End time must be after start time');
+      return;
+    }
+    try {
+      setBlockingSlot(true);
+      await axios.post(`${API_URL}/admin/block-slot`, {
+        date: quickBlockSlot.date,
+        startTime: quickBlockSlot.startTime,
+        endTime: quickBlockSlot.endTime,
+        reason: quickBlockSlot.reason || undefined,
+      });
+      showMessage('success', 'Time slot blocked – users can no longer book it');
+      setQuickBlockSlot(prev => ({ ...prev, startTime: '', endTime: '', reason: '' }));
+      fetchBlockedSlots();
+    } catch (err: any) {
+      const msg = err.response?.data?.message || 'Failed to block slot';
+      showMessage('error', msg);
+    } finally {
+      setBlockingSlot(false);
+    }
+  };
+
   // ===== USERS =====
   const fetchUsers = async () => {
     // Safety check
@@ -435,6 +541,7 @@ export default function AdminPage() {
         return new Date(dateString).toLocaleTimeString('en-US', {
           hour: '2-digit',
           minute: '2-digit',
+          hour12: true,
         });
       }
       return dateString;
@@ -983,7 +1090,69 @@ export default function AdminPage() {
           <div>
             <h2 className="text-2xl font-bold text-gray-900 mb-6">Shop Closure Rules</h2>
 
-            {/* Add Closure Form */}
+            {/* Quick: Block a time slot (instant – disappears on booking page) */}
+            <div className="bg-amber-50/80 border border-amber-200 rounded-2xl shadow-sm p-6 mb-6 max-w-2xl">
+              <h3 className="text-lg font-semibold text-gray-900 mb-1 flex items-center gap-2">
+                <span className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center text-amber-700">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                </span>
+                Block time slot
+              </h3>
+              <p className="text-sm text-amber-800/80 mb-4">Block a specific time range on one day. Those slots disappear for customers immediately (e.g. lunch, meeting).</p>
+              <form onSubmit={blockTimeSlotQuick} className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">Date</label>
+                    <input
+                      type="date"
+                      value={quickBlockSlot.date}
+                      onChange={(e) => setQuickBlockSlot({ ...quickBlockSlot, date: e.target.value })}
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">From (5 min)</label>
+                    <TimeSelect
+                      value={quickBlockSlot.startTime}
+                      onChange={(start) => {
+                        const end = quickBlockSlot.endTime && start && quickBlockSlot.endTime <= start ? '' : quickBlockSlot.endTime;
+                        setQuickBlockSlot({ ...quickBlockSlot, startTime: start, endTime: end });
+                      }}
+                      options={TIME_OPTIONS_5MIN}
+                      placeholder="Select"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">To (5 min)</label>
+                    <TimeSelect
+                      value={quickBlockSlot.endTime}
+                      onChange={(endTime) => setQuickBlockSlot({ ...quickBlockSlot, endTime })}
+                      options={TIME_OPTIONS_5MIN.filter((t) => !quickBlockSlot.startTime || t > quickBlockSlot.startTime)}
+                      placeholder="Select"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">Reason (optional)</label>
+                  <input
+                    type="text"
+                    value={quickBlockSlot.reason}
+                    onChange={(e) => setQuickBlockSlot({ ...quickBlockSlot, reason: e.target.value })}
+                    placeholder="e.g. Lunch break, Meeting"
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none bg-white"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={blockingSlot || !quickBlockSlot.startTime || !quickBlockSlot.endTime}
+                  className="w-full sm:w-auto px-6 py-3 bg-amber-600 text-white font-bold rounded-xl hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {blockingSlot ? 'Blocking…' : 'Block this time slot'}
+                </button>
+              </form>
+            </div>
+
+            {/* Add Closure Form (full day or custom range) */}
             <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100 mb-6 max-w-2xl">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Add Closure</h3>
               <form onSubmit={createBlockedSlot} className="space-y-4">
@@ -1032,37 +1201,26 @@ export default function AdminPage() {
                       <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
                         Start Time (5-min steps)
                       </label>
-                      <select
+                      <TimeSelect
                         value={newBlockedSlot.startTime}
-                        onChange={(e) => {
-                          const start = e.target.value;
+                        onChange={(start) => {
                           const end = newBlockedSlot.endTime && start && newBlockedSlot.endTime <= start ? '' : newBlockedSlot.endTime;
                           setNewBlockedSlot({ ...newBlockedSlot, startTime: start, endTime: end });
                         }}
-                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-                      >
-                        <option value="">Select start</option>
-                        {TIME_OPTIONS_5MIN.map((t) => (
-                          <option key={t} value={t}>{t}</option>
-                        ))}
-                      </select>
+                        options={TIME_OPTIONS_5MIN}
+                        placeholder="Select start"
+                      />
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
                         End Time (5-min steps)
                       </label>
-                      <select
+                      <TimeSelect
                         value={newBlockedSlot.endTime}
-                        onChange={(e) =>
-                          setNewBlockedSlot({ ...newBlockedSlot, endTime: e.target.value })
-                        }
-                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-                      >
-                        <option value="">Select end</option>
-                        {TIME_OPTIONS_5MIN.filter((t) => !newBlockedSlot.startTime || t > newBlockedSlot.startTime).map((t) => (
-                          <option key={t} value={t}>{t}</option>
-                        ))}
-                      </select>
+                        onChange={(endTime) => setNewBlockedSlot({ ...newBlockedSlot, endTime })}
+                        options={TIME_OPTIONS_5MIN.filter((t) => !newBlockedSlot.startTime || t > newBlockedSlot.startTime)}
+                        placeholder="Select end"
+                      />
                     </div>
                   </div>
                 )}
@@ -1111,7 +1269,7 @@ export default function AdminPage() {
                           {slot.isFullDay ? (
                             <span className="text-red-600">Full Day Closed</span>
                           ) : (
-                            <span>{new Date(`2000-01-01T${slot.startTime}`).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date(`2000-01-01T${slot.endTime}`).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                            <span>{new Date(`2000-01-01T${slot.startTime}`).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })} - {new Date(`2000-01-01T${slot.endTime}`).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}</span>
                           )}
                         </div>
                         {slot.reason && (
@@ -1137,10 +1295,11 @@ export default function AdminPage() {
 
         {/* Users Management */}
         {activeTab === 'users' && (
-          <div>
+          <div className="min-w-0 overflow-x-hidden">
             <h2 className="text-2xl font-bold text-gray-900 mb-6">User Management</h2>
 
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            {/* Desktop: table (hidden on mobile to avoid horizontal scroll) */}
+            <div className="hidden md:block bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-100">
                   <tr>
@@ -1205,46 +1364,41 @@ export default function AdminPage() {
               </table>
             </div>
 
-            {/* Mobile User List */}
-            <div className="md:hidden space-y-4 mt-6">
+            {/* Mobile: card list only (no table = no horizontal scroll) */}
+            <div className="md:hidden space-y-3 mt-4">
               {users.length === 0 ? (
-                <div className="text-center text-gray-500">No users found</div>
+                <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center text-gray-500">No users found.</div>
               ) : (
                 users.map(user => (
-                  <div key={user._id} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
-                    <div className="flex justify-between items-start mb-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold">
-                          {user.name?.charAt(0).toUpperCase() || 'U'}
-                        </div>
-                        <div>
-                          <div className="font-semibold text-gray-900">{user.name}</div>
-                          <div className="text-xs text-gray-500">{user.email}</div>
-                        </div>
+                  <div key={user._id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+                    <div className="flex items-start gap-3">
+                      <div className="w-11 h-11 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-sm flex-shrink-0">
+                        {user.name?.charAt(0).toUpperCase() || 'U'}
                       </div>
-                      <span className={`text-xs px-2 py-1 rounded-full font-semibold ${user.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'}`}>
-                        {user.role}
-                      </span>
-                    </div>
-
-                    <div className="flex justify-between items-center pt-3 border-t border-gray-100">
-                      <div>
-                        {user.blocked ? (
-                          <span className="text-xs font-medium text-red-600 flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-red-600"></span> Blocked
+                      <div className="min-w-0 flex-1">
+                        <div className="font-semibold text-gray-900 truncate">{user.name}</div>
+                        <div className="text-xs text-gray-500 truncate" title={user.email}>{user.email}</div>
+                        <div className="flex flex-wrap items-center gap-2 mt-2">
+                          <span className={`text-xs px-2 py-1 rounded-full font-semibold ${user.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'}`}>
+                            {user.role}
                           </span>
-                        ) : (
-                          <span className="text-xs font-medium text-green-600 flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-green-600"></span> Active
-                          </span>
-                        )}
+                          {user.blocked ? (
+                            <span className="text-xs font-medium text-red-600 flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-red-600 flex-shrink-0"></span> Blocked
+                            </span>
+                          ) : (
+                            <span className="text-xs font-medium text-green-600 flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-green-600 flex-shrink-0"></span> Active
+                            </span>
+                          )}
+                        </div>
                       </div>
                       {user.role !== 'admin' && (
                         <button
                           onClick={() => toggleBlockUser(user._id, user.blocked)}
-                          className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${user.blocked
-                            ? 'bg-green-50 text-green-600 hover:bg-green-100'
-                            : 'bg-red-50 text-red-600 hover:bg-red-100'
+                          className={`flex-shrink-0 text-sm font-medium px-4 py-2.5 rounded-xl transition-colors touch-manipulation ${user.blocked
+                            ? 'bg-green-50 text-green-600 hover:bg-green-100 active:bg-green-200'
+                            : 'bg-red-50 text-red-600 hover:bg-red-100 active:bg-red-200'
                             }`}
                         >
                           {user.blocked ? 'Unblock' : 'Block'}

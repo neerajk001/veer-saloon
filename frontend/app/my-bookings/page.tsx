@@ -47,7 +47,11 @@ export default function MyBookingsPage() {
     const formatTime = (isoString: string) => {
         try {
             const date = new Date(isoString);
-            return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+            const h = date.getHours();
+            const m = date.getMinutes();
+            const hour12 = h % 12 || 12;
+            const ampm = h < 12 ? "AM" : "PM";
+            return `${hour12}:${String(m).padStart(2, "0")} ${ampm}`;
         } catch (e) {
             return isoString;
         }

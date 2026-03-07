@@ -56,7 +56,7 @@ export default function Home() {
               <div className="absolute w-[70%] sm:w-[400px] h-[70%] sm:h-[400px] border-[1px] border-gray-100 rounded-full opacity-50 -z-10"></div>
 
               <Image
-                src="/hero.png"
+                src="/hero1.png"
                 alt="Premium Grooming"
                 fill
                 className="object-contain drop-shadow-2xl z-10 hover:scale-[1.02] transition-transform duration-700"

@@ -256,10 +256,14 @@ export default function BookingPage() {
     }
   };
 
-  // Helper to format ISO time to "10:00 AM"
+  // Helper: always 12-hour format (e.g. "10:00 AM") on all devices
   const formatTime = (isoString: string) => {
     const date = new Date(isoString);
-    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const h = date.getHours();
+    const m = date.getMinutes();
+    const hour12 = h % 12 || 12;
+    const ampm = h < 12 ? "AM" : "PM";
+    return `${hour12}:${String(m).padStart(2, "0")} ${ampm}`;
   };
 
   // Check if form is complete
