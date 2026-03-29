@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 import dbConnect from '@/lib/mongodb';
 import Service from '@/models/Service';
 import SaloonConfig from '@/models/SaloonConfig';
@@ -8,6 +10,7 @@ import { addMinutesToDate, isOverlapping } from '@/utils/time.utils';
 
 export async function GET(req: Request) {
     try {
+        const session = await getServerSession(authOptions);
         const { searchParams } = new URL(req.url);
         const date = searchParams.get('date');
         const serviceId = searchParams.get('serviceId');
@@ -21,6 +24,27 @@ export async function GET(req: Request) {
         // Use UTC midnight for calendar day so we match closures stored by block-slot
         const startOfDay = new Date(date + 'T00:00:00.000Z');
         const endOfDay = new Date(date + 'T23:59:59.999Z');
+
+        // --- NEW: CHECK FOR MAX 2 ACTIVE BOOKINGS RULE ---
+        if (session?.user?.email) {
+            // Case-insensitive email comparison for reliable count
+            const activeCount = await Appointment.countDocuments({
+                userEmail: { $regex: new RegExp(`^${session.user.email}$`, 'i') },
+                date: { $gte: startOfDay, $lte: endOfDay },
+                status: 'scheduled'
+            });
+
+            if (activeCount >= 2) {
+                return NextResponse.json({
+                    date,
+                    serviceId,
+                    availableSlots: [],
+                    allSlots: [],
+                    reason: "Limit reached: You can have max 2 active bookings per day."
+                });
+            }
+        }
+        // --------------------------------------------------
 
         // Find closures that overlap this day (works for UTC or local-time stored dates)
         const closures = await Closure.find({

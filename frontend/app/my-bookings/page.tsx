@@ -21,15 +21,13 @@ export default function MyBookingsPage() {
             try {
                 const parsed: Booking[] = JSON.parse(stored);
 
-                // Filter out bookings older than yesterday
+                // Filter out bookings where the appointment time has already passed
                 const now = new Date();
-                const yesterday = new Date(now);
-                yesterday.setDate(now.getDate() - 1);
-                yesterday.setHours(0, 0, 0, 0);
 
                 const validBookings = parsed.filter(b => {
-                    const bookingDate = new Date(b.fullDate);
-                    return bookingDate >= yesterday;
+                    // b.time is an ISO string representing the start of the appointment
+                    const appointmentTime = new Date(b.time);
+                    return appointmentTime > now;
                 });
 
                 // Update local storage if we filtered anything
