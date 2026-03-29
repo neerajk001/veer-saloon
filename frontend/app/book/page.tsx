@@ -271,7 +271,7 @@ export default function BookingPage() {
 
   if (activeClosure) {
     return (
-      <div className="min-h-screen bg-white flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-500">
+      <div className="min-h-screen bg-[#121212] flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-500 text-gray-100">
         <div className="w-24 h-24 bg-red-50 rounded-full flex items-center justify-center mb-6">
           <svg xmlns="http://www.w3.org/2000/svg" className="w-12 h-12 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" /></svg>
         </div>
@@ -296,7 +296,7 @@ export default function BookingPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 flex flex-col items-center justify-center p-6 text-black">
+      <div className="min-h-screen bg-[#121212] flex flex-col items-center justify-center p-6 text-gray-100">
         <div className="bg-white rounded-3xl shadow-2xl p-8 text-center max-w-md w-full animate-in fade-in zoom-in duration-500">
           <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
             <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -311,9 +311,9 @@ export default function BookingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white flex flex-col text-black selection:bg-orange-100 font-sans">
+    <div className="min-h-screen bg-[#121212] flex flex-col text-gray-100 selection:bg-orange-300/40 font-sans">
       {/* Header */}
-      <header className="sticky top-0 bg-white/95 backdrop-blur-md z-50 border-b border-gray-100 transition-all">
+      <header className="sticky top-0 bg-[#121212]/95 backdrop-blur-md z-50 border-b border-slate-800 transition-all">
         <div className="max-w-3xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link href="/" className="group">
             <Image src="/logo.png" alt="Veer Salon" width={140} height={50} className="object-contain grayscale brightness-0" />
@@ -335,7 +335,7 @@ export default function BookingPage() {
             )}
             <Link
               href="/my-bookings"
-              className="text-xs font-bold uppercase tracking-wide px-4 py-2 rounded-full border border-black hover:bg-black hover:text-white transition-all duration-300"
+              className="text-xs font-bold uppercase tracking-wide px-4 py-2 rounded-full border border-slate-300 hover:bg-slate-100 hover:text-slate-900 transition-all duration-300"
             >
               My Bookings
             </Link>
@@ -345,7 +345,7 @@ export default function BookingPage() {
 
       {status === 'loading' ? (
         <div className="flex-1 flex flex-col items-center justify-center min-h-[50vh]">
-          <div className="w-8 h-8 border-4 border-black border-t-transparent rounded-full animate-spin mb-4"></div>
+          <div className="w-8 h-8 border-4 border-gray-200 border-t-transparent rounded-full animate-spin mb-4"></div>
           <p className="text-gray-500 text-sm">Loading...</p>
         </div>
       ) : status === 'unauthenticated' ? (
@@ -609,15 +609,15 @@ export default function BookingPage() {
 
       {/* Fixed Bottom Book Button */}
       {status === 'authenticated' && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-gray-100 p-4 z-40 animate-in slide-in-from-bottom-4">
+        <div className="fixed bottom-0 left-0 right-0 bg-[#121212]/90 backdrop-blur-md border-t border-slate-800 p-4 z-40 animate-in slide-in-from-bottom-4">
           <div className="max-w-2xl mx-auto">
             <button
               onClick={handleConfirm}
               disabled={!isFormComplete || loading}
-              className={`group w-full py-4 rounded-full text-lg font-bold transition-all flex items-center justify-center gap-2 overflow-hidden relative
+              className={`group w-full py-4 rounded-full text-lg font-bold transition-all flex items-center justify-center gap-2 overflow-hidden relative border
               ${isFormComplete && !loading
-                  ? 'bg-black text-white hover:bg-orange-600 shadow-xl shadow-black/10'
-                  : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  ? 'bg-black text-white hover:bg-orange-600 shadow-xl shadow-black/10 border-gray-700'
+                  : 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200'
                 }`}
             >
               {loading ? (

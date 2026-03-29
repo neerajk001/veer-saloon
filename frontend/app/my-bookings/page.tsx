@@ -58,17 +58,17 @@ export default function MyBookingsPage() {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 flex flex-col">
-            <header className="bg-white/80 backdrop-blur-md px-6 py-4 flex items-center border-b border-gray-100 sticky top-0 z-10 shadow-sm">
+        <div className="min-h-screen bg-[#121212] flex flex-col text-gray-100">
+            <header className="bg-[#121212]/80 backdrop-blur-md px-6 py-4 flex items-center border-b border-slate-800 sticky top-0 z-10 shadow-sm">
                 <Link
                     href="/"
-                    className="p-2 mr-4 text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
+                    className="p-2 mr-4 text-gray-300 hover:bg-slate-800 rounded-full transition-colors"
                 >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                     </svg>
                 </Link>
-                <h1 className="text-xl font-bold text-gray-900">My Bookings</h1>
+                <h1 className="text-xl font-bold text-gray-100">My Bookings</h1>
             </header>
 
             <main className="flex-1 p-6 max-w-md mx-auto w-full">
@@ -79,7 +79,7 @@ export default function MyBookingsPage() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                             </svg>
                         </div>
-                        <h3 className="text-lg font-semibold text-gray-900 mb-1">No Active Bookings</h3>
+                        <h3 className="text-lg font-semibold text-gray-100 mb-1">No Active Bookings</h3>
                         <p className="text-sm text-gray-400 mb-6">Your upcoming appointments will appear here.</p>
                         <Link href="/book" className="px-6 py-2 bg-blue-600 text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all active:scale-95">
                             Book Now

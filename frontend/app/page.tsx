@@ -4,9 +4,9 @@ import Footer from "@/components/Footer";
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-white flex flex-col text-black selection:bg-orange-100 font-sans">
+    <div className="min-h-screen bg-[#121212] flex flex-col text-gray-100 selection:bg-orange-300/40 font-sans">
       {/* Header */}
-      <header className="sticky top-0 bg-white/90 backdrop-blur-md z-50 border-b border-gray-100 transition-all">
+      <header className="sticky top-0 bg-[#121212]/90 backdrop-blur-md z-50 border-b border-slate-800 transition-all">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link href="/" className="group">
             <Image src="/logo.png" alt="Veer Salon" width={160} height={60} className="object-contain grayscale brightness-0" />
@@ -14,7 +14,7 @@ export default function Home() {
 
           <Link
             href="/my-bookings"
-            className="text-sm font-bold uppercase tracking-wide px-6 py-2.5 rounded-full border border-black hover:bg-black hover:text-white transition-all duration-300"
+            className="text-sm font-bold uppercase tracking-wide px-6 py-2.5 rounded-full border border-slate-300 hover:bg-slate-100 hover:text-slate-900 transition-all duration-300"
           >
             My Bookings
           </Link>
@@ -35,14 +35,14 @@ export default function Home() {
               Premium Grooming
             </div>
 
-            <h2 className="text-4xl sm:text-6xl md:text-8xl lg:text-9xl font-black tracking-tighter leading-[0.9] text-black">
+            <h2 className="text-4xl sm:text-6xl md:text-8xl lg:text-9xl font-black tracking-tighter leading-[0.9] text-gray-100">
               LOOK <br />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-600 to-orange-500">SHARP.</span>
             </h2>
 
-            <p className="text-xs sm:text-lg lg:text-2xl text-gray-500 font-light max-w-lg leading-relaxed border-l-2 border-orange-200 pl-3 lg:pl-6 leading-tight lg:leading-relaxed">
+            <p className="text-xs sm:text-lg lg:text-2xl text-gray-500 font-light max-w-lg border-l-2 border-orange-200 pl-3 lg:pl-6 leading-tight lg:leading-relaxed">
               Elevate your style. <br />
-              <span className="text-black font-medium">Precision and class.</span>
+              <span className="text-gray-100 font-medium">Precision and class.</span>
             </p>
 
             {/* Button Moved Out */}
@@ -82,7 +82,7 @@ export default function Home() {
         <div className="mt-8 flex justify-center lg:justify-start max-w-7xl mx-auto w-full px-4 md:px-0">
           <Link
             href="/book"
-            className="group relative inline-flex items-center justify-center w-full md:w-auto px-8 py-4 lg:px-12 lg:py-6 text-sm lg:text-xl font-bold text-white bg-black rounded-full hover:bg-orange-600 transition-all duration-300 shadow-xl shadow-orange-900/5 overflow-hidden"
+            className="group relative inline-flex items-center justify-center w-full md:w-auto px-8 py-4 lg:px-12 lg:py-6 text-sm lg:text-xl font-bold text-white bg-black rounded-full border border-gray-700 hover:bg-orange-600 transition-all duration-300 shadow-xl shadow-orange-900/5 overflow-hidden"
           >
             <span className="relative z-10 flex items-center gap-3">
               Book Appointment
@@ -100,9 +100,9 @@ export default function Home() {
               { label: "Products", value: "Premium" },
               { label: "Vibe", value: "Modern" }
             ].map((item, i) => (
-              <div key={i} className="flex flex-col gap-2 border-l border-black pl-6 hover:pl-8 transition-all duration-300 group cursor-default">
-                <span className="text-xs font-bold text-orange-600 uppercase tracking-widest group-hover:text-black transition-colors">{item.label}</span>
-                <span className="text-4xl font-thin text-black group-hover:font-light transition-all">{item.value}</span>
+              <div key={i} className="flex flex-col gap-2 border-l border-slate-500 pl-6 hover:pl-8 transition-all duration-300 group cursor-default">
+                <span className="text-xs font-bold text-orange-500 uppercase tracking-widest group-hover:text-orange-300 transition-colors">{item.label}</span>
+                <span className="text-4xl font-thin text-gray-100 group-hover:font-light transition-all">{item.value}</span>
               </div>
             ))}
           </div>

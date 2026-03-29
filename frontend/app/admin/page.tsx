@@ -576,16 +576,16 @@ export default function AdminPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#121212] text-gray-100">
       {/* Sticky Header */}
-      <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-gray-200">
+      <header className="sticky top-0 z-30 bg-[#121212]/80 backdrop-blur-md border-b border-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl shadow-lg flex items-center justify-center text-white font-bold">
                 VS
               </div>
-              <h1 className="text-xl md:text-2xl font-bold text-gray-900 tracking-tight">Veer Salon Admin</h1>
+              <h1 className="text-xl md:text-2xl font-bold text-gray-100 tracking-tight">Veer Salon Admin</h1>
             </div>
             <div className="flex items-center gap-3">
               {/* User Info */}
@@ -643,7 +643,7 @@ export default function AdminPage() {
       )}
 
       {/* Mobile-Friendly Navigation */}
-      <div className="bg-white border-b border-gray-200 sticky top-[73px] z-20 shadow-sm">
+      <div className="bg-[#121212] border-b border-slate-800 sticky top-[73px] z-20 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <nav className="flex gap-2 overflow-x-auto py-3 no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0">
             {(() => {
@@ -675,7 +675,7 @@ export default function AdminPage() {
         {/* Dashboard */}
         {activeTab === 'dashboard' && (
           <div className="animate-in fade-in duration-500">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6 tracking-tight">Dashboard Overview</h2>
+            <h2 className="text-2xl font-bold text-gray-100 mb-6 tracking-tight">Dashboard Overview</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100 hover:shadow-md transition-shadow">
                 <div className="text-sm font-medium text-gray-500 mb-2 uppercase tracking-wide">Customers today</div>
@@ -719,7 +719,7 @@ export default function AdminPage() {
         {/* Services */}
         {activeTab === 'services' && (
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Services</h2>
+            <h2 className="text-2xl font-bold text-gray-100 mb-6">Services</h2>
 
             {/* Add Service Form */}
             <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100 mb-6">
@@ -835,7 +835,7 @@ export default function AdminPage() {
         {activeTab === 'appointments' && (
           <div>
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">Appointments</h2>
+              <h2 className="text-2xl font-bold text-gray-100">Appointments</h2>
               <input
                 type="date"
                 value={selectedDate}
@@ -980,7 +980,7 @@ export default function AdminPage() {
         {/* Settings */}
         {activeTab === 'settings' && (
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Salon Settings</h2>
+            <h2 className="text-2xl font-bold text-gray-100 mb-6">Salon Settings</h2>
 
             <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100 max-w-3xl">
               <form onSubmit={saveConfig} className="space-y-8">
@@ -1088,7 +1088,7 @@ export default function AdminPage() {
         {/* Blocked Slots / Closures */}
         {activeTab === 'blocked' && (
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Shop Closure Rules</h2>
+            <h2 className="text-2xl font-bold text-gray-100 mb-6">Shop Closure Rules</h2>
 
             {/* Quick: Block a time slot (instant – disappears on booking page) */}
             <div className="bg-amber-50/80 border border-amber-200 rounded-2xl shadow-sm p-6 mb-6 max-w-2xl">
@@ -1296,7 +1296,7 @@ export default function AdminPage() {
         {/* Users Management */}
         {activeTab === 'users' && (
           <div className="min-w-0 overflow-x-hidden">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">User Management</h2>
+            <h2 className="text-2xl font-bold text-gray-100 mb-6">User Management</h2>
 
             {/* Desktop: table (hidden on mobile to avoid horizontal scroll) */}
             <div className="hidden md:block bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
