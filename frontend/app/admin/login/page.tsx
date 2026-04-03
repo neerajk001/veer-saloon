@@ -42,7 +42,7 @@ function LoginLogic() {
         return (
             <div className="flex flex-col items-center">
                 <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-                <p className="text-gray-300 font-medium">Checking authentication...</p>
+                <p className="text-gray-600 font-medium">Checking authentication...</p>
             </div>
         );
     }
@@ -54,8 +54,8 @@ function LoginLogic() {
                 <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl shadow-2xl mb-4">
                     <span className="text-3xl font-bold text-white">VS</span>
                 </div>
-                <h1 className="text-3xl font-bold text-gray-100 mb-2">Veer Salon Admin</h1>
-                <p className="text-gray-300">Sign in to access the admin panel</p>
+                <h1 className="text-3xl font-bold text-gray-900 mb-2">Veer Salon Admin</h1>
+                <p className="text-gray-600">Sign in to access the admin panel</p>
             </div>
 
             {/* Login Card */}
@@ -104,7 +104,7 @@ function LoginLogic() {
 
             {/* Back Link */}
             <div className="text-center mt-6">
-                <a href="/" className="text-sm text-gray-300 hover:text-white font-medium inline-flex items-center gap-2">
+                <a href="/" className="text-sm text-gray-500 hover:text-gray-900 font-medium inline-flex items-center gap-2">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                     </svg>
@@ -117,11 +117,11 @@ function LoginLogic() {
 
 export default function AdminLoginPage() {
     return (
-        <div className="min-h-screen bg-[#121212] flex items-center justify-center p-4">
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
             <Suspense fallback={
                 <div className="text-center">
                     <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                    <p className="text-slate-300 font-medium">Loading login page...</p>
+                    <p className="text-gray-600 font-medium">Loading login page...</p>
                 </div>
             }>
                 <LoginLogic />
