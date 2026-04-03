@@ -311,9 +311,9 @@ export default function BookingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#121212] flex flex-col text-gray-100 selection:bg-orange-300/40 font-sans">
+    <div className="min-h-screen bg-white flex flex-col text-gray-900 selection:bg-orange-100 font-sans">
       {/* Header */}
-      <header className="sticky top-0 bg-[#121212]/95 backdrop-blur-md z-50 border-b border-slate-800 transition-all">
+      <header className="sticky top-0 bg-white/95 backdrop-blur-md z-50 border-b border-gray-200 transition-all">
         <div className="max-w-3xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link href="/" className="group">
             <Image src="/logo.png" alt="Veer Salon" width={140} height={50} className="object-contain grayscale brightness-0" />
@@ -335,7 +335,7 @@ export default function BookingPage() {
             )}
             <Link
               href="/my-bookings"
-              className="text-xs font-bold uppercase tracking-wide px-4 py-2 rounded-full border border-slate-300 hover:bg-slate-100 hover:text-slate-900 transition-all duration-300"
+              className="text-xs font-bold uppercase tracking-wide px-4 py-2 rounded-full border border-gray-300 hover:bg-gray-100 hover:text-black transition-all duration-300 text-gray-600"
             >
               My Bookings
             </Link>
@@ -609,14 +609,14 @@ export default function BookingPage() {
 
       {/* Fixed Bottom Book Button */}
       {status === 'authenticated' && (
-        <div className="fixed bottom-0 left-0 right-0 bg-[#121212]/90 backdrop-blur-md border-t border-slate-800 p-4 z-40 animate-in slide-in-from-bottom-4">
+        <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-gray-200 p-4 z-40 animate-in slide-in-from-bottom-4">
           <div className="max-w-2xl mx-auto">
             <button
               onClick={handleConfirm}
               disabled={!isFormComplete || loading}
               className={`group w-full py-4 rounded-full text-lg font-bold transition-all flex items-center justify-center gap-2 overflow-hidden relative border
               ${isFormComplete && !loading
-                  ? 'bg-black text-white hover:bg-orange-600 shadow-xl shadow-black/10 border-gray-700'
+                  ? 'bg-black text-white hover:bg-orange-600 shadow-xl shadow-black/10 border-gray-800'
                   : 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200'
                 }`}
             >

@@ -6,7 +6,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-[#121212] flex flex-col text-gray-100 selection:bg-orange-300/40 font-sans">
       {/* Header */}
-      <header className="sticky top-0 bg-[#121212]/90 backdrop-blur-md z-50 border-b border-slate-800 transition-all">
+      <header className="sticky top-0 bg-[#262626]/90 backdrop-blur-md z-50 border-b border-slate-800 transition-all">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link href="/" className="group">
             <Image src="/logo.png" alt="Veer Salon" width={160} height={60} className="object-contain grayscale brightness-0" />
