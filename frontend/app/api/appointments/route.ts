@@ -113,12 +113,38 @@ export async function GET(req: Request) {
     try {
         const { searchParams } = new URL(req.url);
         const date = searchParams.get('date');
-
-        if (!date) {
-            return NextResponse.json({ message: "Date is required" }, { status: 400 });
-        }
+        const userEmail = searchParams.get('userEmail');
 
         await dbConnect();
+
+        // --- MY BOOKINGS: fetch by logged-in user ---
+        if (userEmail) {
+            const nextAuthSession = await getServerSession(authOptions);
+            if (!nextAuthSession) {
+                return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+            }
+
+            // Security: users can only fetch THEIR OWN bookings
+            const sessionEmail = nextAuthSession.user?.email || '';
+            if (sessionEmail.toLowerCase() !== userEmail.toLowerCase()) {
+                return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+            }
+
+            const appointments = await Appointment.find({
+                userEmail: { $regex: new RegExp(`^${userEmail}$`, 'i') },
+                status: { $in: ['scheduled'] } // only active/upcoming
+            })
+                .sort({ startTime: 1 })
+                .populate('serviceId', 'name duration price');
+
+            return NextResponse.json(appointments);
+        }
+
+        // --- ADMIN: fetch by date ---
+        if (!date) {
+            return NextResponse.json({ message: "Date or userEmail is required" }, { status: 400 });
+        }
+
         const appointments = await Appointment.find({
             date: new Date(date)
         })
