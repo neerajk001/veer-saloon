@@ -354,19 +354,15 @@ export default function AdminPage() {
     }
   };
 
-  const downloadAllBookingsCSV = async () => {
+  const downloadBookingsCSV = async () => {
     try {
-      setLoading(true);
-      const res = await axios.get(`${API_URL}/appointments?export=true`);
-      const allAppointments = res.data;
-      
-      if (!allAppointments || allAppointments.length === 0) {
-        showMessage('error', 'No appointments to download');
+      if (!appointments || appointments.length === 0) {
+        showMessage('error', 'No appointments to download for this date');
         return;
       }
       
       const headers = ['Name', 'Phone Number', 'Date', 'Start Time', 'End Time', 'Service', 'Status'];
-      const rows = allAppointments.map((apt: any) => {
+      const rows = appointments.map((apt: any) => {
         const dateStr = apt.date ? new Date(apt.date).toLocaleDateString() : '';
         return [
           `"${(apt.customername || '').replace(/"/g, '""')}"`,
@@ -384,7 +380,7 @@ export default function AdminPage() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `all_bookings_${new Date().toISOString().split('T')[0]}.csv`);
+      link.setAttribute('download', `bookings_${selectedDate}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -393,8 +389,6 @@ export default function AdminPage() {
     } catch (error) {
       console.error('Error downloading bookings:', error);
       showMessage('error', 'Failed to download bookings');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -882,13 +876,13 @@ export default function AdminPage() {
               <h2 className="text-2xl font-bold text-gray-900">Appointments</h2>
               <div className="flex items-center gap-3">
                 <button
-                  onClick={downloadAllBookingsCSV}
+                  onClick={downloadBookingsCSV}
                   disabled={loading}
                   className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm disabled:opacity-50"
-                  title="Download all bookings as CSV for Google Sheets/Excel"
+                  title="Download bookings for the selected date as CSV for Google Sheets/Excel"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                  Export All
+                  Export Date
                 </button>
                 <input
                   type="date"
