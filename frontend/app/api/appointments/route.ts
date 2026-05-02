@@ -140,9 +140,18 @@ export async function GET(req: Request) {
             return NextResponse.json(appointments);
         }
 
+        // --- ADMIN: fetch all (export) ---
+        const exportAll = searchParams.get('export');
+        if (exportAll === 'true') {
+            const appointments = await Appointment.find({})
+                .sort({ date: -1, startTime: 1 })
+                .populate("serviceId", "name duration");
+            return NextResponse.json(appointments);
+        }
+
         // --- ADMIN: fetch by date ---
         if (!date) {
-            return NextResponse.json({ message: "Date or userEmail is required" }, { status: 400 });
+            return NextResponse.json({ message: "Date, userEmail, or export flag is required" }, { status: 400 });
         }
 
         const appointments = await Appointment.find({

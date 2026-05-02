@@ -354,6 +354,50 @@ export default function AdminPage() {
     }
   };
 
+  const downloadAllBookingsCSV = async () => {
+    try {
+      setLoading(true);
+      const res = await axios.get(`${API_URL}/appointments?export=true`);
+      const allAppointments = res.data;
+      
+      if (!allAppointments || allAppointments.length === 0) {
+        showMessage('error', 'No appointments to download');
+        return;
+      }
+      
+      const headers = ['Name', 'Phone Number', 'Date', 'Start Time', 'End Time', 'Service', 'Status'];
+      const rows = allAppointments.map((apt: any) => {
+        const dateStr = apt.date ? new Date(apt.date).toLocaleDateString() : '';
+        return [
+          `"${(apt.customername || '').replace(/"/g, '""')}"`,
+          `"${apt.phoneNumber || ''}"`,
+          `"${dateStr}"`,
+          `"${formatTime(apt.startTime)}"`,
+          `"${formatTime(apt.endTime)}"`,
+          `"${apt.serviceId?.name ? apt.serviceId.name.replace(/"/g, '""') : 'N/A'}"`,
+          `"${apt.status || ''}"`
+        ];
+      });
+      
+      const csvContent = [headers.join(','), ...rows.map((r: any) => r.join(','))].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `all_bookings_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      showMessage('success', 'Bookings downloaded successfully');
+    } catch (error) {
+      console.error('Error downloading bookings:', error);
+      showMessage('error', 'Failed to download bookings');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // ===== SETTINGS =====
   const fetchConfig = async () => {
     try {
@@ -834,14 +878,25 @@ export default function AdminPage() {
         {/* Appointments */}
         {activeTab === 'appointments' && (
           <div>
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
               <h2 className="text-2xl font-bold text-gray-900">Appointments</h2>
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={downloadAllBookingsCSV}
+                  disabled={loading}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm disabled:opacity-50"
+                  title="Download all bookings as CSV for Google Sheets/Excel"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                  Export All
+                </button>
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                />
+              </div>
             </div>
 
             {/* Appointments List - Desktop Table */}
