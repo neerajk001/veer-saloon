@@ -12,12 +12,9 @@ function LoginLogic() {
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        // Debug logging
-        console.log('Login Page Status:', status);
-        console.log('Login Page Session:', session);
+
 
         if (status === 'authenticated') {
-            console.log('Redirecting to admin...');
             router.push('/admin');
         }
 
@@ -30,7 +27,6 @@ function LoginLogic() {
     const handleGoogleSignIn = async () => {
         try {
             setError(null);
-            console.log('Initiating Google Sign In...');
             await signIn('google', { callbackUrl: '/admin' });
         } catch (err) {
             console.error('Sign in error:', err);

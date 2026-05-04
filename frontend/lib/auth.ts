@@ -2,22 +2,9 @@ import { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import dbConnect from "@/lib/mongodb";
 import User from "@/models/User";
+import { ADMIN_EMAILS } from "@/lib/admin";
 
-// Automatically detect the correct URL for both local and production
-const getBaseUrl = () => {
-    // For production (Render, Vercel, etc.)
-    if (process.env.NEXTAUTH_URL) {
-        return process.env.NEXTAUTH_URL;
-    }
 
-    // For Vercel deployments
-    if (process.env.VERCEL_URL) {
-        return `https://${process.env.VERCEL_URL}`;
-    }
-
-    // For local development
-    return "http://localhost:3000";
-};
 
 export const authOptions: NextAuthOptions = {
     providers: [
@@ -37,11 +24,7 @@ export const authOptions: NextAuthOptions = {
                 // Check if user exists
                 let dbUser = await User.findOne({ email });
 
-                // Define admin emails (Consider moving to env or DB config later)
-                const adminEmails = [
-                    "ganesh404veer@gmail.com",
-                    "neerajkushwaha0401@gmail.com"
-                ];
+                const adminEmails = ADMIN_EMAILS;
 
                 const isAdmin = adminEmails.includes(email);
 
@@ -92,7 +75,7 @@ export const authOptions: NextAuthOptions = {
             // Fetch latest user data from DB to ensure role/blocked status is current
             if (token.email) {
                 await dbConnect();
-                const dbUser = await User.findOne({ email: token.email.toLowerCase() });
+                const dbUser = await User.findOne({ email: token.email.toLowerCase() }).select('_id role blocked name').lean();
                 if (dbUser) {
                     token.id = dbUser._id.toString();
                     token.role = dbUser.role;

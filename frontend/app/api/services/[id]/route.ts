@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/adminAuth';
 import dbConnect from '@/lib/mongodb';
 import Service from '@/models/Service';
 
@@ -25,6 +26,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
+        // Require admin auth
+        const adminSession = await requireAdmin();
+        if (!adminSession) {
+            return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+        }
+
         const { id } = await params;
         if (!id) return NextResponse.json({ message: "Service id is required" }, { status: 400 });
 
@@ -41,6 +48,12 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
+        // Require admin auth
+        const adminSession = await requireAdmin();
+        if (!adminSession) {
+            return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+        }
+
         const { id } = await params;
         const body = await req.json();
         const { name, duration, price } = body;

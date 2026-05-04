@@ -42,20 +42,27 @@ export async function GET(req: Request) {
 
         await dbConnect();
 
-        const total = await Appointment.countDocuments({
-            date: { $gte: monthStart, $lt: monthEnd },
-            status: { $ne: 'canceled' },
-        });
-
-        const scheduled = await Appointment.countDocuments({
-            date: { $gte: monthStart, $lt: monthEnd },
-            status: 'scheduled',
-        });
-
-        const completed = await Appointment.countDocuments({
-            date: { $gte: monthStart, $lt: monthEnd },
-            status: 'completed',
-        });
+        // Single aggregation instead of 3 separate countDocuments calls
+        const [result] = await Appointment.aggregate([
+            {
+                $match: {
+                    date: { $gte: monthStart, $lt: monthEnd },
+                    status: { $ne: 'canceled' },
+                }
+            },
+            {
+                $group: {
+                    _id: null,
+                    total: { $sum: 1 },
+                    scheduled: {
+                        $sum: { $cond: [{ $eq: ['$status', 'scheduled'] }, 1, 0] }
+                    },
+                    completed: {
+                        $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] }
+                    },
+                }
+            }
+        ]);
 
         const monthLabel = `${year}-${String(month + 1).padStart(2, '0')}`;
 
@@ -63,9 +70,9 @@ export async function GET(req: Request) {
             year,
             month: month + 1,
             date: monthLabel,
-            total,
-            scheduled,
-            completed,
+            total: result?.total ?? 0,
+            scheduled: result?.scheduled ?? 0,
+            completed: result?.completed ?? 0,
         });
     } catch (error) {
         console.error('Error fetching monthly count:', error);

@@ -13,7 +13,7 @@ const serviceSchema = new Schema({
         type: Number,
         required: true
     },
-    isAcitve: {
+    isActive: {
         type: Boolean,
         default: true
     }

@@ -143,7 +143,7 @@ export default function MyBookingsPage() {
                 )}
 
                 {/* ── Loading ── */}
-                {status === 'loading' || (status === 'authenticated' && loading) && (
+                {(status === 'loading' || (status === 'authenticated' && loading)) && (
                     <div className="flex flex-col items-center justify-center h-[50vh]">
                         <div className="w-8 h-8 border-4 border-gray-200 border-t-black rounded-full animate-spin mb-4"></div>
                         <p className="text-gray-500 text-sm">Loading your bookings...</p>

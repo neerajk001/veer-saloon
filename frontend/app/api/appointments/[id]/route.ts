@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { requireAdmin } from '@/lib/adminAuth';
 import dbConnect from '@/lib/mongodb';
 import Appointment from '@/models/Appointment';
 
@@ -49,6 +50,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 // ─── PUT: Admin status update ───────────────────────────────────────────────
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
+        // Require admin auth
+        const adminSession = await requireAdmin();
+        if (!adminSession) {
+            return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+        }
+
         const { id } = await params;
         const body = await req.json();
         const { status } = body;
@@ -86,6 +93,12 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 // ─── DELETE: Admin hard delete ──────────────────────────────────────────────
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
+        // Require admin auth
+        const adminSession = await requireAdmin();
+        if (!adminSession) {
+            return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+        }
+
         const { id } = await params;
         await dbConnect();
         const appointment = await Appointment.findByIdAndDelete(id);

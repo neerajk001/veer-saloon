@@ -38,5 +38,9 @@ const appointmentSchema = new Schema({
     }
 }, { timestamps: true });
 
+// Compound indexes for common query patterns
+appointmentSchema.index({ date: 1, status: 1 });
+appointmentSchema.index({ userEmail: 1, date: 1, status: 1 });
+
 const Appointment = mongoose.models.Appointment || mongoose.model('Appointment', appointmentSchema);
 export default Appointment;

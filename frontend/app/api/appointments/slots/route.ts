@@ -6,7 +6,7 @@ import Service from '@/models/Service';
 import SaloonConfig from '@/models/SaloonConfig';
 import Appointment from '@/models/Appointment';
 import Closure from '@/models/Closure';
-import { addMinutesToDate, isOverlapping } from '@/utils/time.utils';
+import { addMinutesToDate, isOverlapping, escapeRegex, SALON_TIMEZONE_OFFSET } from '@/utils/time.utils';
 
 export async function GET(req: Request) {
     try {
@@ -28,8 +28,9 @@ export async function GET(req: Request) {
         // --- NEW: CHECK FOR MAX 2 ACTIVE BOOKINGS RULE ---
         if (session?.user?.email) {
             // Case-insensitive email comparison for reliable count
+            const escapedEmail = escapeRegex(session.user.email);
             const activeCount = await Appointment.countDocuments({
-                userEmail: { $regex: new RegExp(`^${session.user.email}$`, 'i') },
+                userEmail: { $regex: new RegExp(`^${escapedEmail}$`, 'i') },
                 date: { $gte: startOfDay, $lte: endOfDay },
                 status: 'scheduled'
             });
@@ -101,9 +102,8 @@ export async function GET(req: Request) {
         const allSlots: Array<{ time: Date; available: boolean }> = [];
         const slots: Date[] = [];
 
-        // Parse "HH:mm" in same timezone as slot generation (+05:30) so overlap check is correct
-        const timeZoneOffset = "+05:30";
-        const parseTimeStr = (timeStr: string) => new Date(`${date}T${timeStr}:00${timeZoneOffset}`);
+        // Parse "HH:mm" in same timezone as slot generation so overlap check is correct
+        const parseTimeStr = (timeStr: string) => new Date(`${date}T${timeStr}:00${SALON_TIMEZONE_OFFSET}`);
 
         const canFitService = (slotStart: Date): boolean => {
             const slotEnd = addMinutesToDate(slotStart, slotDuration);
@@ -136,12 +136,8 @@ export async function GET(req: Request) {
             // Constructing Date with time string directly might be timezone sensitive.
             // Using logic consistent with existing code, but ensuring we stick to the requested 'date'.
 
-            // Existing logic uses explicit timezone offset in string, let's keep it but verify format
-            // Assuming config times are like "09:00"
-
-            const timeZoneOffset = "+05:30"; // Existing hardcoded offset
-            const dayStart = new Date(`${date}T${startTime}:00${timeZoneOffset}`);
-            const dayEnd = new Date(`${date}T${endTime}:00${timeZoneOffset}`);
+            const dayStart = new Date(`${date}T${startTime}:00${SALON_TIMEZONE_OFFSET}`);
+            const dayEnd = new Date(`${date}T${endTime}:00${SALON_TIMEZONE_OFFSET}`);
 
             let current = new Date(dayStart);
 

@@ -1,9 +1,16 @@
 import { NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/adminAuth';
 import dbConnect from '@/lib/mongodb';
 import Service from '@/models/Service';
 
 export async function POST(req: Request) {
     try {
+        // Require admin auth
+        const adminSession = await requireAdmin();
+        if (!adminSession) {
+            return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+        }
+
         const body = await req.json();
         const { name, duration, price } = body;
 

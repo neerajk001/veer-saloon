@@ -1,12 +1,16 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { requireAdmin } from "@/lib/adminAuth";
 import dbConnect from '@/lib/mongodb';
 import Appointment from '@/models/Appointment';
 import Service from '@/models/Service';
 import SaloonConfig from '@/models/SaloonConfig';
-import { addMinutesToDate, isOverlapping } from '@/utils/time.utils';
+import { addMinutesToDate, isOverlapping, escapeRegex } from '@/utils/time.utils';
 import mongoose from 'mongoose';
+
+// Indian phone: 10 digits starting with 6-9
+const PHONE_REGEX = /^[6-9]\d{9}$/;
 
 export async function POST(req: Request) {
     const session = await dbConnect(); // In this setup dbConnect returns the mongoose instance
@@ -26,6 +30,18 @@ export async function POST(req: Request) {
             return NextResponse.json({ message: 'All fields are required' }, { status: 400 });
         }
 
+        // Sanitize customer name
+        const sanitizedName = String(customername).trim().slice(0, 100);
+        if (!sanitizedName) {
+            return NextResponse.json({ message: 'Invalid customer name' }, { status: 400 });
+        }
+
+        // Validate phone number
+        const cleanPhone = String(phoneNumber).trim();
+        if (!PHONE_REGEX.test(cleanPhone)) {
+            return NextResponse.json({ message: 'Invalid phone number. Must be 10 digits starting with 6-9.' }, { status: 400 });
+        }
+
         const service = await Service.findById(serviceId).session(mongoSession);
         if (!service) {
             await mongoSession.abortTransaction();
@@ -41,10 +57,11 @@ export async function POST(req: Request) {
         const appointmentDate = new Date(date);
         appointmentDate.setHours(0, 0, 0, 0);
 
-        // --- NEW: MAX 2 ACTIVE BOOKINGS PER DAY RULE ---
+        // --- MAX 2 ACTIVE BOOKINGS PER DAY RULE ---
         const userEmail = nextAuthSession.user?.email;
+        const escapedEmail = escapeRegex(userEmail || '');
         const activeCount = await Appointment.countDocuments({
-            userEmail: { $regex: new RegExp(`^${userEmail}$`, 'i') },
+            userEmail: { $regex: new RegExp(`^${escapedEmail}$`, 'i') },
             date: {
                 $gte: appointmentDate,
                 $lt: new Date(appointmentDate.getTime() + 24 * 60 * 60 * 1000)
@@ -82,13 +99,13 @@ export async function POST(req: Request) {
         }
 
         const newAppointment = new Appointment({
-            customername,
+            customername: sanitizedName,
             date: new Date(date),
             serviceId,
-            phoneNumber,
+            phoneNumber: cleanPhone,
             startTime: start,
             endTime: end,
-            status: body.status || 'scheduled',
+            status: 'scheduled', // Never trust client-provided status
             userEmail: userEmail
         });
 
@@ -130,8 +147,9 @@ export async function GET(req: Request) {
                 return NextResponse.json({ message: "Forbidden" }, { status: 403 });
             }
 
+            const escapedEmail = escapeRegex(userEmail);
             const appointments = await Appointment.find({
-                userEmail: { $regex: new RegExp(`^${userEmail}$`, 'i') },
+                userEmail: { $regex: new RegExp(`^${escapedEmail}$`, 'i') },
                 status: { $in: ['scheduled'] } // only active/upcoming
             })
                 .sort({ startTime: 1 })
@@ -140,9 +158,13 @@ export async function GET(req: Request) {
             return NextResponse.json(appointments);
         }
 
-        // --- ADMIN: fetch all (export) ---
+        // --- ADMIN: fetch all (export) — requires admin auth ---
         const exportAll = searchParams.get('export');
         if (exportAll === 'true') {
+            const adminSession = await requireAdmin();
+            if (!adminSession) {
+                return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+            }
             const appointments = await Appointment.find({})
                 .sort({ date: -1, startTime: 1 })
                 .populate("serviceId", "name duration");
@@ -154,8 +176,11 @@ export async function GET(req: Request) {
             return NextResponse.json({ message: "Date, userEmail, or export flag is required" }, { status: 400 });
         }
 
+        // Use range query for consistent date matching
+        const dayStart = new Date(date + 'T00:00:00.000Z');
+        const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
         const appointments = await Appointment.find({
-            date: new Date(date)
+            date: { $gte: dayStart, $lt: dayEnd }
         })
             .sort({ startTime: 1 })
             .populate("serviceId", "name duration");

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/adminAuth';
 import dbConnect from '@/lib/mongodb';
 import SaloonConfig from '@/models/SaloonConfig';
 
@@ -23,6 +24,12 @@ export async function GET() {
 
 export async function POST(req: Request) {
     try {
+        // Require admin auth
+        const adminSession = await requireAdmin();
+        if (!adminSession) {
+            return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+        }
+
         await dbConnect();
         const existingConfig = await SaloonConfig.findOne();
 
@@ -51,6 +58,12 @@ export async function POST(req: Request) {
 
 export async function PUT(req: Request) {
     try {
+        // Require admin auth
+        const adminSession = await requireAdmin();
+        if (!adminSession) {
+            return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+        }
+
         await dbConnect();
         const body = await req.json();
         const { morningSlot, eveningSlot, daysOff } = body;

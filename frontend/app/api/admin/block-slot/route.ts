@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/adminAuth';
 import dbConnect from '@/lib/mongodb';
 import Closure from '@/models/Closure';
 
@@ -12,6 +13,12 @@ const FIVE_MIN_REGEX = /^([01]?\d|2[0-3]):(00|05|10|15|20|25|30|35|40|45|50|55)$
 
 export async function POST(req: Request) {
     try {
+        // Require admin auth
+        const adminSession = await requireAdmin();
+        if (!adminSession) {
+            return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+        }
+
         await dbConnect();
         const body = await req.json();
         const { date, startTime, endTime, reason } = body;

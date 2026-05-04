@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/adminAuth';
 import dbConnect from '@/lib/mongodb';
 import Closure from '@/models/Closure';
 
@@ -17,6 +18,12 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
     try {
+        // Require admin auth
+        const adminSession = await requireAdmin();
+        if (!adminSession) {
+            return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+        }
+
         await dbConnect();
         const body = await req.json();
         const { startDate, endDate, startTime, endTime, isFullDay, reason } = body;
@@ -79,6 +86,12 @@ export async function POST(req: Request) {
 
 export async function DELETE(req: Request) {
     try {
+        // Require admin auth
+        const adminSession = await requireAdmin();
+        if (!adminSession) {
+            return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+        }
+
         await dbConnect();
         const { searchParams } = new URL(req.url);
         const id = searchParams.get('id');
@@ -87,7 +100,10 @@ export async function DELETE(req: Request) {
             return NextResponse.json({ message: "Closure ID required" }, { status: 400 });
         }
 
-        await Closure.findByIdAndDelete(id);
+        const deleted = await Closure.findByIdAndDelete(id);
+        if (!deleted) {
+            return NextResponse.json({ message: "Closure not found" }, { status: 404 });
+        }
         return NextResponse.json({ message: "Closure removed" });
     } catch (error) {
         return NextResponse.json({ message: "Server error" }, { status: 500 });

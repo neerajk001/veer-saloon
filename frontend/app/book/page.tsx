@@ -13,7 +13,7 @@ type Service = {
   name: string;
   duration: number; // in minutes
   price: number;
-  isAcitve?: boolean;
+  isActive?: boolean;
 };
 
 type SlotItem = {
@@ -216,21 +216,7 @@ export default function BookingPage() {
         startTime: selectedSlot,
       });
 
-      // --- SAVE BOOKING TO LOCAL STORAGE (My Bookings) ---
-      const newBooking = {
-        id: Date.now().toString(),
-        serviceName: selectedService.name,
-        date: `${selectedDate?.day}, ${selectedDate?.date}`,
-        fullDate: selectedDate?.fullDate,
-        time: selectedSlot,
-        customerName: details.name,
-        createdAt: Date.now()
-      };
 
-      const existingBookingsStr = localStorage.getItem('veer_my_bookings');
-      const existingBookings = existingBookingsStr ? JSON.parse(existingBookingsStr) : [];
-      localStorage.setItem('veer_my_bookings', JSON.stringify([newBooking, ...existingBookings]));
-      // ---------------------------------------------------
 
       setSuccess(true);
       setTimeout(() => {
@@ -418,7 +404,7 @@ export default function BookingPage() {
                         <span className={`text-xs uppercase tracking-widest mt-1 ${isSelected ? 'text-gray-400' : 'text-gray-400'}`}>{service.duration} mins</span>
                       </div>
                       <div className="flex items-center gap-4">
-                        <span className={`font-bold text-xl ${isSelected ? 'text-white' : 'text-black'}`}>{service.price}</span>
+                        <span className={`font-bold text-xl ${isSelected ? 'text-white' : 'text-black'}`}>₹{service.price}</span>
                         <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? 'border-orange-500 bg-orange-500' : 'border-gray-200'}`}>
                           {isSelected && <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
                         </div>
@@ -596,7 +582,7 @@ export default function BookingPage() {
                     <div className="flex justify-between items-center">
                       <span className="text-lg font-black uppercase tracking-tight text-black">Total</span>
                       <span className="text-2xl font-black text-black">
-                        {selectedService.price}
+                        ₹{selectedService.price}
                       </span>
                     </div>
                   </div>

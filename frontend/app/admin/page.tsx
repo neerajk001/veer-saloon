@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import Link from 'next/link';
 import { useSession, signOut } from 'next-auth/react';
+import { isAdminEmail } from '@/lib/admin';
 
 const API_URL = '/api';
 
@@ -93,7 +94,7 @@ interface Service {
   name: string;
   price: number;
   duration: number;
-  isAcitve?: boolean;
+  isActive?: boolean;
 }
 
 interface Appointment {
@@ -207,8 +208,7 @@ export default function AdminPage() {
   // Redirect if not admin
   useEffect(() => {
     if (session?.user) {
-      const isAdmin = (session.user as any).role === 'admin' ||
-        ['ganesh404veer@gmail.com', 'neerajkushwaha0401@gmail.com'].includes(session.user.email?.toLowerCase() || '');
+      const isAdmin = (session.user as any).role === 'admin' || isAdminEmail(session.user.email);
 
       if (!isAdmin) {
         // Optional: Redirect to home or show error
@@ -217,8 +217,7 @@ export default function AdminPage() {
     }
   }, [session]);
 
-  const isAdmin = (session?.user as any)?.role === 'admin' ||
-    ['ganesh404veer@gmail.com', 'neerajkushwaha0401@gmail.com'].includes(session?.user?.email?.toLowerCase() || '');
+  const isAdmin = (session?.user as any)?.role === 'admin' || isAdminEmail(session?.user?.email);
 
   if (session && !isAdmin) {
     return (
@@ -297,7 +296,7 @@ export default function AdminPage() {
         name: newService.name,
         price: parseFloat(newService.price),
         duration: parseInt(newService.duration),
-        isAcitve: true,
+        isActive: true,
       });
       showMessage('success', 'Service created successfully');
       setNewService({ name: '', price: '', duration: '' });
@@ -542,8 +541,7 @@ export default function AdminPage() {
   // ===== USERS =====
   const fetchUsers = async () => {
     // Safety check
-    const isAdmin = (session?.user as any)?.role === 'admin' ||
-      ['ganesh404veer@gmail.com', 'neerajkushwaha0401@gmail.com'].includes(session?.user?.email?.toLowerCase() || '');
+    const isAdmin = (session?.user as any)?.role === 'admin' || isAdminEmail(session?.user?.email);
 
     if (!isAdmin) return;
 
@@ -685,8 +683,7 @@ export default function AdminPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <nav className="flex gap-2 overflow-x-auto py-3 no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0">
             {(() => {
-              const isAdmin = (session?.user as any)?.role === 'admin' ||
-                ['ganesh404veer@gmail.com', 'neerajkushwaha0401@gmail.com'].includes(session?.user?.email?.toLowerCase() || '');
+              const isAdmin = (session?.user as any)?.role === 'admin' || isAdminEmail(session?.user?.email);
 
               const tabs = ['dashboard', 'services', 'appointments', 'settings', 'blocked'];
               if (isAdmin) tabs.push('users');
@@ -818,7 +815,7 @@ export default function AdminPage() {
                     {services.map((service) => (
                       <tr key={service._id} className="hover:bg-gray-50 transition-colors">
                         <td className="px-6 py-4 text-sm font-medium text-gray-900">{service.name}</td>
-                        <td className="px-6 py-4 text-sm font-medium text-blue-600">${service.price}</td>
+                        <td className="px-6 py-4 text-sm font-medium text-blue-600">₹{service.price}</td>
                         <td className="px-6 py-4 text-sm text-gray-500 flex items-center gap-2">
                           <span className="w-2 h-2 rounded-full bg-gray-300"></span>
                           {service.duration} mins
@@ -850,7 +847,7 @@ export default function AdminPage() {
                     <div>
                       <h4 className="font-semibold text-gray-900">{service.name}</h4>
                       <div className="flex items-center gap-3 mt-1 text-sm text-gray-500">
-                        <span className="font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">${service.price}</span>
+                        <span className="font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">₹{service.price}</span>
                         <span>•</span>
                         <span>{service.duration} mins</span>
                       </div>

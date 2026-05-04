@@ -25,26 +25,33 @@ export async function GET(req: Request) {
 
         await dbConnect();
 
-        const total = await Appointment.countDocuments({
-            date: { $gte: dayStart, $lt: dayEnd },
-            status: { $ne: 'canceled' },
-        });
-
-        const scheduled = await Appointment.countDocuments({
-            date: { $gte: dayStart, $lt: dayEnd },
-            status: 'scheduled',
-        });
-
-        const completed = await Appointment.countDocuments({
-            date: { $gte: dayStart, $lt: dayEnd },
-            status: 'completed',
-        });
+        // Single aggregation instead of 3 separate countDocuments calls
+        const [result] = await Appointment.aggregate([
+            {
+                $match: {
+                    date: { $gte: dayStart, $lt: dayEnd },
+                    status: { $ne: 'canceled' },
+                }
+            },
+            {
+                $group: {
+                    _id: null,
+                    total: { $sum: 1 },
+                    scheduled: {
+                        $sum: { $cond: [{ $eq: ['$status', 'scheduled'] }, 1, 0] }
+                    },
+                    completed: {
+                        $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] }
+                    },
+                }
+            }
+        ]);
 
         return NextResponse.json({
             date: dateStr,
-            total,
-            scheduled,
-            completed,
+            total: result?.total ?? 0,
+            scheduled: result?.scheduled ?? 0,
+            completed: result?.completed ?? 0,
         });
     } catch (error) {
         console.error('Error fetching daily count:', error);

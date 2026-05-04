@@ -19,7 +19,14 @@ export default function AdminLayout({
         if (!isLoginPage && status === 'unauthenticated') {
             router.push('/admin/login');
         }
-    }, [status, router, isLoginPage]);
+        // Redirect non-admin users
+        if (!isLoginPage && status === 'authenticated' && session?.user) {
+            const role = (session.user as any)?.role;
+            if (role !== 'admin') {
+                router.push('/');
+            }
+        }
+    }, [status, router, isLoginPage, session]);
 
     // Allow login page to render without auth check
     if (isLoginPage) {

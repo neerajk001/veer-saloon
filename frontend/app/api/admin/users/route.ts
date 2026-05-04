@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { requireAdmin } from '@/lib/adminAuth';
 import dbConnect from '@/lib/mongodb';
 import User from '@/models/User';
 
@@ -9,16 +8,8 @@ export const dynamic = 'force-dynamic';
 // GET all users
 export async function GET(req: Request) {
     try {
-        const session = await getServerSession(authOptions);
-
-        // Check if admin
-        // Note: You might need to extend the session type to include 'role'
-        // For now, let's trust the authOptions callback logic or check email against list
-        // Since we added role to session in authOptions, we can check it.
-        const isAdmin = (session?.user as any)?.role === 'admin' ||
-            ['ganesh404veer@gmail.com', 'neerajkushwaha0401@gmail.com'].includes(session?.user?.email?.toLowerCase() || '');
-
-        if (!session || !isAdmin) {
+        const adminSession = await requireAdmin();
+        if (!adminSession) {
             return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
         }
 
@@ -36,11 +27,8 @@ export async function GET(req: Request) {
 // PUT request to update user status (Block/Unblock)
 export async function PUT(req: Request) {
     try {
-        const session = await getServerSession(authOptions);
-        const isAdmin = (session?.user as any)?.role === 'admin' ||
-            ['ganesh404veer@gmail.com', 'neerajkushwaha0401@gmail.com'].includes(session?.user?.email?.toLowerCase() || '');
-
-        if (!session || !isAdmin) {
+        const adminSession = await requireAdmin();
+        if (!adminSession) {
             return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
         }
 
