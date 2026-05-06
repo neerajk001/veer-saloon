@@ -4,17 +4,17 @@ import Footer from "@/components/Footer";
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-[#121212] flex flex-col text-gray-100 selection:bg-orange-300/40 font-sans">
+    <div className="min-h-screen flex flex-col text-slate-100 selection:bg-amber-300/40 font-sans bg-[radial-gradient(circle_at_10%_10%,#2a2f3a_0%,#171b24_42%,#0f131b_100%)]">
       {/* Header */}
-      <header className="sticky top-0 bg-[#262626]/90 backdrop-blur-md z-50 border-b border-slate-800 transition-all">
+      <header className="sticky top-0 bg-slate-900/65 backdrop-blur-xl z-50 border-b border-slate-700/60 transition-all">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link href="/" className="group">
-            <Image src="/logo.png" alt="Veer Salon" width={160} height={60} className="object-contain grayscale brightness-0" />
+            <Image src="/logo.png" alt="Veer Salon" width={160} height={60} className="object-contain grayscale brightness-200 contrast-75" />
           </Link>
 
           <Link
             href="/my-bookings"
-            className="text-sm font-bold uppercase tracking-wide px-6 py-2.5 rounded-full border border-slate-300 hover:bg-slate-100 hover:text-slate-900 transition-all duration-300"
+            className="text-sm font-bold uppercase tracking-wide px-6 py-2.5 rounded-full border border-slate-400/70 text-slate-100 hover:bg-amber-100 hover:text-slate-900 transition-all duration-300"
           >
             My Bookings
           </Link>
@@ -27,7 +27,7 @@ export default function Home() {
 
           {/* Left Content */}
           <div className="text-left space-y-4 lg:space-y-10 animate-in fade-in slide-in-from-bottom-8 duration-700">
-            <div className="inline-flex items-center gap-2 lg:gap-3 px-3 py-1 lg:px-4 lg:py-1.5 rounded-full bg-orange-50 border border-orange-100 text-orange-600 text-[10px] lg:text-xs font-bold tracking-widest uppercase">
+            <div className="inline-flex items-center gap-2 lg:gap-3 px-3 py-1 lg:px-4 lg:py-1.5 rounded-full bg-amber-50/95 border border-amber-100 text-amber-700 text-[10px] lg:text-xs font-bold tracking-widest uppercase shadow-lg shadow-amber-950/10">
               <span className="relative flex h-1.5 w-1.5 lg:h-2 lg:w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-full w-full bg-orange-500"></span>
@@ -35,14 +35,14 @@ export default function Home() {
               Premium Grooming
             </div>
 
-            <h2 className="text-4xl sm:text-6xl md:text-8xl lg:text-9xl font-black tracking-tighter leading-[0.9] text-gray-100">
+            <h2 className="text-4xl sm:text-6xl md:text-8xl lg:text-9xl font-black tracking-tighter leading-[0.9] text-slate-100">
               LOOK <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-600 to-orange-500">SHARP.</span>
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-500 to-orange-500">SHARP.</span>
             </h2>
 
-            <p className="text-xs sm:text-lg lg:text-2xl text-gray-500 font-light max-w-lg border-l-2 border-orange-200 pl-3 lg:pl-6 leading-tight lg:leading-relaxed">
+            <p className="text-xs sm:text-lg lg:text-2xl text-slate-300/80 font-light max-w-lg border-l-2 border-amber-300/70 pl-3 lg:pl-6 leading-tight lg:leading-relaxed">
               Elevate your style. <br />
-              <span className="text-gray-100 font-medium">Precision and class.</span>
+              <span className="text-slate-100 font-medium">Precision and class.</span>
             </p>
 
             {/* Button Moved Out */}
@@ -52,8 +52,8 @@ export default function Home() {
           <div className="relative flex items-center justify-center animate-in fade-in duration-1000 delay-200">
             <div className="relative w-full h-[250px] sm:h-[450px] lg:h-[600px] flex items-center justify-center">
               {/* Abstract geometric shapes behind image for depth */}
-              <div className="absolute w-[90%] sm:w-[500px] h-[90%] sm:h-[500px] border-[1px] border-orange-100 rounded-full opacity-30 -z-10 animate-pulse-slow"></div>
-              <div className="absolute w-[70%] sm:w-[400px] h-[70%] sm:h-[400px] border-[1px] border-gray-100 rounded-full opacity-50 -z-10"></div>
+              <div className="absolute w-[90%] sm:w-[500px] h-[90%] sm:h-[500px] border-[1px] border-amber-300/50 rounded-full opacity-35 -z-10 animate-pulse-slow"></div>
+              <div className="absolute w-[70%] sm:w-[400px] h-[70%] sm:h-[400px] border-[1px] border-slate-200/50 rounded-full opacity-50 -z-10"></div>
 
               <Image
                 src="/hero1.png"
@@ -64,7 +64,7 @@ export default function Home() {
               />
 
               {/* Floating Rating Card */}
-              <div className="absolute bottom-2 -left-2 lg:bottom-10 lg:-left-10 bg-white/90 backdrop-blur-sm p-3 lg:p-6 shadow-2xl border border-gray-100 rounded-2xl z-20 animate-in slide-in-from-bottom-8 delay-500 transform scale-75 lg:scale-100 origin-bottom-left">
+              <div className="absolute bottom-2 -left-2 lg:bottom-10 lg:-left-10 bg-white/90 backdrop-blur-sm p-3 lg:p-6 shadow-2xl border border-slate-100 rounded-2xl z-20 animate-in slide-in-from-bottom-8 delay-500 transform scale-75 lg:scale-100 origin-bottom-left">
                 <div className="flex items-center gap-2 lg:gap-4 mb-1 lg:mb-2">
                   <span className="text-2xl lg:text-4xl font-black text-black">4.9</span>
                   <div className="flex text-orange-500 space-x-0.5">
@@ -82,7 +82,7 @@ export default function Home() {
         <div className="mt-8 flex justify-center lg:justify-start max-w-7xl mx-auto w-full px-4 md:px-0">
           <Link
             href="/book"
-            className="group relative inline-flex items-center justify-center w-full md:w-auto px-8 py-4 lg:px-12 lg:py-6 text-sm lg:text-xl font-bold text-white bg-black rounded-full border border-gray-700 hover:bg-orange-600 transition-all duration-300 shadow-xl shadow-orange-900/5 overflow-hidden"
+            className="group relative inline-flex items-center justify-center w-full md:w-auto px-8 py-4 lg:px-12 lg:py-6 text-sm lg:text-xl font-bold text-white bg-slate-950/90 rounded-full border border-slate-500/70 hover:bg-orange-600 transition-all duration-300 shadow-xl shadow-slate-950/40 overflow-hidden"
           >
             <span className="relative z-10 flex items-center gap-3">
               Book Appointment
@@ -92,7 +92,7 @@ export default function Home() {
         </div>
 
         {/* Thin Order Section */}
-        <div className="max-w-7xl mx-auto w-full mt-32 border-t border-gray-200 pt-12 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300">
+        <div className="max-w-7xl mx-auto w-full mt-32 border-t border-slate-500/60 pt-12 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-12">
             {[
               { label: "Experience", value: "10 Years" },
@@ -100,9 +100,9 @@ export default function Home() {
               { label: "Products", value: "Premium" },
               { label: "Vibe", value: "Modern" }
             ].map((item, i) => (
-              <div key={i} className="flex flex-col gap-2 border-l border-slate-500 pl-6 hover:pl-8 transition-all duration-300 group cursor-default">
-                <span className="text-xs font-bold text-orange-500 uppercase tracking-widest group-hover:text-orange-300 transition-colors">{item.label}</span>
-                <span className="text-4xl font-thin text-gray-100 group-hover:font-light transition-all">{item.value}</span>
+              <div key={i} className="flex flex-col gap-2 border-l border-slate-500/80 pl-6 hover:pl-8 transition-all duration-300 group cursor-default">
+                <span className="text-xs font-bold text-amber-400 uppercase tracking-widest group-hover:text-amber-300 transition-colors">{item.label}</span>
+                <span className="text-4xl font-thin text-slate-100 group-hover:font-light transition-all">{item.value}</span>
               </div>
             ))}
           </div>
