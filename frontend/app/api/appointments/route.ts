@@ -24,9 +24,16 @@ export async function POST(req: Request) {
         }
 
         const body = await req.json();
-        const { customername, date, serviceId, phoneNumber, startTime } = body;
+        const { customername, date, serviceId, serviceIds, phoneNumber, startTime } = body;
 
-        if (!customername || !date || !serviceId || !phoneNumber || !startTime) {
+        const parsedServiceIds: string[] = Array.isArray(serviceIds)
+            ? serviceIds.map(String)
+            : (typeof serviceIds === 'string' ? serviceIds.split(',') : []);
+
+        const serviceIdsList = parsedServiceIds.map(s => s.trim()).filter(Boolean);
+        if (serviceId && serviceIdsList.length === 0) serviceIdsList.push(String(serviceId));
+
+        if (!customername || !date || serviceIdsList.length === 0 || !phoneNumber || !startTime) {
             return NextResponse.json({ message: 'All fields are required' }, { status: 400 });
         }
 
@@ -42,8 +49,8 @@ export async function POST(req: Request) {
             return NextResponse.json({ message: 'Invalid phone number. Must be 10 digits starting with 6-9.' }, { status: 400 });
         }
 
-        const service = await Service.findById(serviceId).session(mongoSession);
-        if (!service) {
+        const services = await Service.find({ _id: { $in: serviceIdsList } }).session(mongoSession);
+        if (!services || services.length !== serviceIdsList.length) {
             await mongoSession.abortTransaction();
             return NextResponse.json({ message: 'Service not found' }, { status: 404 });
         }
@@ -77,8 +84,14 @@ export async function POST(req: Request) {
         }
         // ----------------------------------------------
 
+        const totalDuration = services.reduce((sum, s: any) => sum + (Number(s.duration) || 0), 0);
+        if (!totalDuration || totalDuration <= 0) {
+            await mongoSession.abortTransaction();
+            return NextResponse.json({ message: 'Invalid service duration' }, { status: 400 });
+        }
+
         const start = new Date(startTime);
-        const end = addMinutesToDate(start, service.duration);
+        const end = addMinutesToDate(start, totalDuration);
 
         // Ensure no overlapping active appointments for the slot
         const existingAppointments = await Appointment.find({
@@ -101,7 +114,8 @@ export async function POST(req: Request) {
         const newAppointment = new Appointment({
             customername: sanitizedName,
             date: new Date(date),
-            serviceId,
+            serviceId: serviceIdsList[0], // keep legacy field for compatibility
+            serviceIds: serviceIdsList,
             phoneNumber: cleanPhone,
             startTime: start,
             endTime: end,
@@ -153,7 +167,8 @@ export async function GET(req: Request) {
                 status: { $in: ['scheduled'] } // only active/upcoming
             })
                 .sort({ startTime: 1 })
-                .populate('serviceId', 'name duration price');
+                .populate('serviceIds', 'name duration price priceMin priceMax')
+                .populate('serviceId', 'name duration price priceMin priceMax');
 
             return NextResponse.json(appointments);
         }
@@ -167,7 +182,8 @@ export async function GET(req: Request) {
             }
             const appointments = await Appointment.find({})
                 .sort({ date: -1, startTime: 1 })
-                .populate("serviceId", "name duration");
+                .populate("serviceIds", "name duration price priceMin priceMax")
+                .populate("serviceId", "name duration price priceMin priceMax");
             return NextResponse.json(appointments);
         }
 
@@ -183,7 +199,8 @@ export async function GET(req: Request) {
             date: { $gte: dayStart, $lt: dayEnd }
         })
             .sort({ startTime: 1 })
-            .populate("serviceId", "name duration");
+            .populate("serviceIds", "name duration price priceMin priceMax")
+            .populate("serviceId", "name duration price priceMin priceMax");
 
         return NextResponse.json(appointments);
 

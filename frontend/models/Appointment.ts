@@ -10,11 +10,18 @@ const appointmentSchema = new Schema({
         required: true,
         index: true
     },
+    // Legacy single-service field (kept for backward compatibility)
     serviceId: {
         type: Schema.Types.ObjectId,
         ref: 'Service',
-        required: true
+        required: false
     },
+    // New multi-service support
+    serviceIds: [{
+        type: Schema.Types.ObjectId,
+        ref: 'Service',
+        required: true
+    }],
     phoneNumber: {
         type: String,
         required: true
@@ -37,6 +44,12 @@ const appointmentSchema = new Schema({
         required: true
     }
 }, { timestamps: true });
+
+// Ensure at least one service is present (either legacy serviceId or new serviceIds[])
+appointmentSchema.path('serviceIds').validate(function (value: unknown) {
+    const hasServiceIds = Array.isArray(value) && value.length > 0;
+    return hasServiceIds || !!(this as any).serviceId;
+}, 'At least one service is required');
 
 // Compound indexes for common query patterns
 appointmentSchema.index({ date: 1, status: 1 });

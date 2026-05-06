@@ -13,12 +13,18 @@ interface Booking {
     startTime: string;
     endTime: string;
     status: string;
-    serviceId: {
+    serviceId?: {
         _id: string;
         name: string;
         duration: number;
         price: number;
     } | null;
+    serviceIds?: Array<{
+        _id: string;
+        name: string;
+        duration: number;
+        price: number;
+    }>;
 }
 
 export default function MyBookingsPage() {
@@ -202,11 +208,18 @@ export default function MyBookingsPage() {
                                                         Confirmed
                                                     </span>
                                                     <h3 className="text-lg font-bold text-gray-900 leading-tight">
-                                                        {booking.serviceId?.name ?? 'Service'}
+                                                        {(booking.serviceIds?.length
+                                                            ? booking.serviceIds.map(s => s.name).join(', ')
+                                                            : (booking.serviceId?.name ?? 'Service'))}
                                                     </h3>
-                                                    {booking.serviceId?.duration && (
-                                                        <p className="text-xs text-gray-500 mt-0.5">{booking.serviceId.duration} mins</p>
-                                                    )}
+                                                    {(() => {
+                                                        const totalMins = booking.serviceIds?.length
+                                                            ? booking.serviceIds.reduce((sum, s) => sum + (Number(s.duration) || 0), 0)
+                                                            : (Number(booking.serviceId?.duration) || 0);
+                                                        return totalMins ? (
+                                                            <p className="text-xs text-gray-500 mt-0.5">{totalMins} mins</p>
+                                                        ) : null;
+                                                    })()}
                                                 </div>
                                                 {/* Time */}
                                                 <div className="text-right">

@@ -13,10 +13,16 @@ export async function GET(req: Request) {
         const session = await getServerSession(authOptions);
         const { searchParams } = new URL(req.url);
         const date = searchParams.get('date');
-        const serviceId = searchParams.get('serviceId');
+        const serviceId = searchParams.get('serviceId'); // legacy
+        const serviceIdsParam = searchParams.get('serviceIds');
 
-        if (!date || !serviceId) {
-            return NextResponse.json({ message: "Missing date or serviceId" }, { status: 400 });
+        const serviceIdsList = (serviceIdsParam ? serviceIdsParam.split(',') : [])
+            .map(s => s.trim())
+            .filter(Boolean);
+        if (serviceId && serviceIdsList.length === 0) serviceIdsList.push(serviceId);
+
+        if (!date || serviceIdsList.length === 0) {
+            return NextResponse.json({ message: "Missing date or serviceIds" }, { status: 400 });
         }
 
         await dbConnect();
@@ -38,7 +44,7 @@ export async function GET(req: Request) {
             if (activeCount >= 2) {
                 return NextResponse.json({
                     date,
-                    serviceId,
+                    serviceIds: serviceIdsList,
                     availableSlots: [],
                     allSlots: [],
                     reason: "Limit reached: You can have max 2 active bookings per day."
@@ -53,8 +59,8 @@ export async function GET(req: Request) {
             endDate: { $gte: startOfDay }
         });
 
-        const [service, config, appointments] = await Promise.all([
-            Service.findById(serviceId),
+        const [services, config, appointments] = await Promise.all([
+            Service.find({ _id: { $in: serviceIdsList } }),
             SaloonConfig.findOne(),
             Appointment.find({
                 date: { $gte: startOfDay, $lte: endOfDay },
@@ -62,7 +68,7 @@ export async function GET(req: Request) {
             })
         ]);
 
-        if (!service) {
+        if (!services || services.length !== serviceIdsList.length) {
             return NextResponse.json({ message: "Service not found" }, { status: 404 });
         }
 
@@ -96,7 +102,10 @@ export async function GET(req: Request) {
             });
         }
 
-        const slotDuration = service.duration;
+        const slotDuration = services.reduce((sum, s: any) => sum + (Number(s.duration) || 0), 0);
+        if (!slotDuration || slotDuration <= 0) {
+            return NextResponse.json({ message: "Invalid service duration" }, { status: 400 });
+        }
         const SLOT_INTERVAL = 5;
 
         const allSlots: Array<{ time: Date; available: boolean }> = [];
@@ -169,7 +178,7 @@ export async function GET(req: Request) {
 
         return NextResponse.json({
             date,
-            serviceId,
+            serviceIds: serviceIdsList,
             availableSlots: slots,
             allSlots
         });

@@ -93,6 +93,8 @@ interface Service {
   _id: string;
   name: string;
   price: number;
+  priceMin?: number;
+  priceMax?: number;
   duration: number;
   isActive?: boolean;
 }
@@ -105,11 +107,16 @@ interface Appointment {
   startTime: string;
   endTime: string;
   status: string;
-  serviceId: {
+  serviceId?: {
     _id: string;
     name: string;
     duration: number;
   };
+  serviceIds?: Array<{
+    _id: string;
+    name: string;
+    duration: number;
+  }>;
 }
 
 interface SalonConfig {
@@ -153,6 +160,8 @@ export default function AdminPage() {
   // Services State
   const [services, setServices] = useState<Service[]>([]);
   const [newService, setNewService] = useState({ name: '', price: '', duration: '' });
+  const [editingServiceId, setEditingServiceId] = useState<string | null>(null);
+  const [editService, setEditService] = useState<{ name: string; price: string; duration: string; isActive: boolean } | null>(null);
 
   // Appointments State
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -294,7 +303,7 @@ export default function AdminPage() {
     try {
       await axios.post(`${API_URL}/services/create`, {
         name: newService.name,
-        price: parseFloat(newService.price),
+        price: newService.price,
         duration: parseInt(newService.duration),
         isActive: true,
       });
@@ -307,6 +316,20 @@ export default function AdminPage() {
     }
   };
 
+  const formatServicePrice = (service: Service): string => {
+    const min = typeof service.priceMin === 'number' ? service.priceMin : undefined;
+    const max = typeof service.priceMax === 'number' ? service.priceMax : undefined;
+    if (min !== undefined && max !== undefined && min !== max) return `₹${min} - ₹${max}`;
+    return `₹${service.price}`;
+  };
+
+  const servicePriceInput = (service: Service): string => {
+    const min = typeof service.priceMin === 'number' ? service.priceMin : undefined;
+    const max = typeof service.priceMax === 'number' ? service.priceMax : undefined;
+    if (min !== undefined && max !== undefined && min !== max) return `${min} - ${max}`;
+    return String(service.price ?? '');
+  };
+
   const deleteService = async (id: string) => {
     if (!window.confirm('Are you sure you want to delete this service?')) return;
 
@@ -317,6 +340,58 @@ export default function AdminPage() {
     } catch (error) {
       console.error('Error deleting service:', error);
       showMessage('error', 'Failed to delete service');
+    }
+  };
+
+  const startEditService = (service: Service) => {
+    setEditingServiceId(service._id);
+    setEditService({
+      name: service.name || '',
+      price: servicePriceInput(service),
+      duration: String(service.duration ?? ''),
+      isActive: service.isActive !== false,
+    });
+  };
+
+  const cancelEditService = () => {
+    setEditingServiceId(null);
+    setEditService(null);
+  };
+
+  const saveEditService = async () => {
+    if (!editingServiceId || !editService) return;
+    if (!editService.name.trim()) {
+      showMessage('error', 'Service name is required');
+      return;
+    }
+
+    if (!String(editService.price).trim()) {
+      showMessage('error', 'Price is required');
+      return;
+    }
+
+    const duration = Number(editService.duration);
+    if (!Number.isFinite(duration) || duration <= 0) {
+      showMessage('error', 'Invalid duration');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await axios.put(`${API_URL}/services/${editingServiceId}`, {
+        name: editService.name.trim(),
+        price: editService.price,
+        duration,
+        isActive: editService.isActive,
+      });
+      showMessage('success', 'Service updated successfully');
+      cancelEditService();
+      fetchServices();
+    } catch (error) {
+      console.error('Error updating service:', error);
+      showMessage('error', 'Failed to update service');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -363,13 +438,16 @@ export default function AdminPage() {
       const headers = ['Name', 'Phone Number', 'Date', 'Start Time', 'End Time', 'Service', 'Status'];
       const rows = appointments.map((apt: any) => {
         const dateStr = apt.date ? new Date(apt.date).toLocaleDateString() : '';
+        const serviceLabel = (apt.serviceIds?.length
+          ? apt.serviceIds.map((s: any) => s?.name).filter(Boolean).join(' + ')
+          : (apt.serviceId?.name || 'N/A'));
         return [
           `"${(apt.customername || '').replace(/"/g, '""')}"`,
           `"${apt.phoneNumber || ''}"`,
           `"${dateStr}"`,
           `"${formatTime(apt.startTime)}"`,
           `"${formatTime(apt.endTime)}"`,
-          `"${apt.serviceId?.name ? apt.serviceId.name.replace(/"/g, '""') : 'N/A'}"`,
+          `"${String(serviceLabel).replace(/"/g, '""')}"`,
           `"${apt.status || ''}"`
         ];
       });
@@ -773,8 +851,8 @@ export default function AdminPage() {
                   className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                 />
                 <input
-                  type="number"
-                  placeholder="Price ($)"
+                  type="text"
+                  placeholder="Price (e.g., 300 or 300 - 400)"
                   value={newService.price}
                   onChange={(e) => setNewService({ ...newService, price: e.target.value })}
                   className="w-full md:w-32 px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
@@ -802,36 +880,123 @@ export default function AdminPage() {
               ) : services.length === 0 ? (
                 <div className="p-12 text-center text-gray-500">No services created yet.</div>
               ) : (
-                <table className="w-full">
-                  <thead className="bg-gray-50 border-b border-gray-100">
-                    <tr>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Name</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Price</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Duration</th>
-                      <th className="px-6 py-4 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {services.map((service) => (
-                      <tr key={service._id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-6 py-4 text-sm font-medium text-gray-900">{service.name}</td>
-                        <td className="px-6 py-4 text-sm font-medium text-blue-600">₹{service.price}</td>
-                        <td className="px-6 py-4 text-sm text-gray-500 flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full bg-gray-300"></span>
-                          {service.duration} mins
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <button
-                            onClick={() => deleteService(service._id)}
-                            className="text-red-500 hover:text-red-700 text-sm font-medium bg-red-50 hover:bg-red-100 px-3 py-1 rounded-lg transition-colors"
-                          >
-                            Delete
-                          </button>
-                        </td>
+                <div className="max-h-[60vh] overflow-y-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 border-b border-gray-100 sticky top-0 z-10">
+                      <tr>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Name</th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Price</th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Duration</th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Active</th>
+                        <th className="px-6 py-4 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {services.map((service) => {
+                        const isEditing = editingServiceId === service._id;
+                        return (
+                          <tr key={service._id} className="hover:bg-gray-50 transition-colors align-top">
+                            <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                              {isEditing ? (
+                                <input
+                                  value={editService?.name ?? ''}
+                                  onChange={(e) => setEditService((p) => p ? ({ ...p, name: e.target.value }) : p)}
+                                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                                />
+                              ) : (
+                                <div className="flex items-center gap-2">
+                                  <span>{service.name}</span>
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 text-sm font-medium text-blue-600">
+                              {isEditing ? (
+                                <input
+                                  type="text"
+                                  value={editService?.price ?? ''}
+                                  onChange={(e) => setEditService((p) => p ? ({ ...p, price: e.target.value }) : p)}
+                                  className="w-32 px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                                />
+                              ) : (
+                                <>{formatServicePrice(service)}</>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-500">
+                              {isEditing ? (
+                                <input
+                                  type="number"
+                                  value={editService?.duration ?? ''}
+                                  onChange={(e) => setEditService((p) => p ? ({ ...p, duration: e.target.value }) : p)}
+                                  className="w-40 px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                                />
+                              ) : (
+                                <span className="inline-flex items-center gap-2">
+                                  <span className="w-2 h-2 rounded-full bg-gray-300"></span>
+                                  {service.duration} mins
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-600">
+                              {isEditing ? (
+                                <label className="inline-flex items-center gap-2 select-none">
+                                  <input
+                                    type="checkbox"
+                                    checked={!!editService?.isActive}
+                                    onChange={(e) => setEditService((p) => p ? ({ ...p, isActive: e.target.checked }) : p)}
+                                    className="h-4 w-4"
+                                  />
+                                  <span className="text-sm">Active</span>
+                                </label>
+                              ) : (
+                                <span className={`px-2 py-1 rounded-full text-xs font-semibold ${service.isActive === false ? 'bg-gray-100 text-gray-500' : 'bg-green-50 text-green-700'}`}>
+                                  {service.isActive === false ? 'Inactive' : 'Active'}
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              {isEditing ? (
+                                <div className="flex justify-end gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={saveEditService}
+                                    disabled={loading}
+                                    className="text-white bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                                  >
+                                    Save
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={cancelEditService}
+                                    className="text-gray-600 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="flex justify-end gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => startEditService(service)}
+                                    className="text-blue-600 hover:text-blue-800 text-sm font-medium bg-blue-50 hover:bg-blue-100 px-3 py-1 rounded-lg transition-colors"
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => deleteService(service._id)}
+                                    className="text-red-500 hover:text-red-700 text-sm font-medium bg-red-50 hover:bg-red-100 px-3 py-1 rounded-lg transition-colors"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
 
@@ -843,22 +1008,96 @@ export default function AdminPage() {
                 <div className="p-8 text-center text-gray-500 bg-white rounded-2xl">No services yet</div>
               ) : (
                 services.map((service) => (
-                  <div key={service._id} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center">
-                    <div>
-                      <h4 className="font-semibold text-gray-900">{service.name}</h4>
-                      <div className="flex items-center gap-3 mt-1 text-sm text-gray-500">
-                        <span className="font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">₹{service.price}</span>
-                        <span>•</span>
-                        <span>{service.duration} mins</span>
+                  <div key={service._id} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+                    {editingServiceId === service._id ? (
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Name</label>
+                          <input
+                            value={editService?.name ?? ''}
+                            onChange={(e) => setEditService((p) => p ? ({ ...p, name: e.target.value }) : p)}
+                            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Price</label>
+                            <input
+                              type="text"
+                              value={editService?.price ?? ''}
+                              onChange={(e) => setEditService((p) => p ? ({ ...p, price: e.target.value }) : p)}
+                              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Duration</label>
+                            <input
+                              type="number"
+                              value={editService?.duration ?? ''}
+                              onChange={(e) => setEditService((p) => p ? ({ ...p, duration: e.target.value }) : p)}
+                              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                            />
+                          </div>
+                        </div>
+                        <label className="flex items-center gap-2 text-sm text-gray-700">
+                          <input
+                            type="checkbox"
+                            checked={!!editService?.isActive}
+                            onChange={(e) => setEditService((p) => p ? ({ ...p, isActive: e.target.checked }) : p)}
+                            className="h-4 w-4"
+                          />
+                          Active
+                        </label>
+                        <div className="grid grid-cols-2 gap-3 pt-1">
+                          <button
+                            type="button"
+                            onClick={saveEditService}
+                            disabled={loading}
+                            className="py-3 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50"
+                          >
+                            Save
+                          </button>
+                          <button
+                            type="button"
+                            onClick={cancelEditService}
+                            className="py-3 rounded-xl bg-gray-100 text-gray-700 font-semibold hover:bg-gray-200 transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                    <button
-                      onClick={() => deleteService(service._id)}
-                      className="text-red-500 bg-red-50 p-2 rounded-lg hover:bg-red-100 active:scale-95 transition-all"
-                      aria-label="Delete service"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
-                    </button>
+                    ) : (
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h4 className="font-semibold text-gray-900">{service.name}</h4>
+                          <div className="flex items-center gap-3 mt-1 text-sm text-gray-500 flex-wrap">
+                            <span className="font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">{formatServicePrice(service)}</span>
+                            <span>•</span>
+                            <span>{service.duration} mins</span>
+                            <span>•</span>
+                            <span className={`px-2 py-0.5 rounded-md text-xs font-semibold ${service.isActive === false ? 'bg-gray-100 text-gray-500' : 'bg-green-50 text-green-700'}`}>
+                              {service.isActive === false ? 'Inactive' : 'Active'}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => startEditService(service)}
+                            className="text-blue-600 bg-blue-50 px-3 py-2 rounded-lg hover:bg-blue-100 active:scale-95 transition-all text-sm font-semibold"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => deleteService(service._id)}
+                            className="text-red-500 bg-red-50 p-2 rounded-lg hover:bg-red-100 active:scale-95 transition-all"
+                            aria-label="Delete service"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))
               )}
@@ -917,7 +1156,11 @@ export default function AdminPage() {
                           <div className="text-sm font-medium text-gray-900">{apt.customername}</div>
                           <div className="text-xs text-gray-500">{apt.phoneNumber}</div>
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-600">{apt.serviceId?.name || 'N/A'}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          {(apt.serviceIds?.length
+                            ? apt.serviceIds.map((s) => s.name).join(', ')
+                            : (apt.serviceId?.name || 'N/A'))}
+                        </td>
                         <td className="px-6 py-4">
                           <span
                             className={`px-3 py-1 inline-flex text-xs font-semibold rounded-full ${getStatusColor(
@@ -995,7 +1238,9 @@ export default function AdminPage() {
                           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
                         </div>
                         <div className="text-sm font-medium text-gray-700">
-                          {apt.serviceId?.name || 'N/A'}
+                          {(apt.serviceIds?.length
+                            ? apt.serviceIds.map((s) => s.name).join(', ')
+                            : (apt.serviceId?.name || 'N/A'))}
                         </div>
                       </div>
                     </div>

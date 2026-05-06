@@ -74,7 +74,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
             id,
             { status },
             { new: true }
-        ).populate("serviceId", "name duration");
+        )
+            .populate("serviceIds", "name duration")
+            .populate("serviceId", "name duration");
 
         if (!appointment) {
             return NextResponse.json({ message: "Appointment not found" }, { status: 404 });

@@ -7,6 +7,37 @@ import Service from '@/models/Service';
 
 export const dynamic = 'force-dynamic';
 
+function parsePriceInput(priceInput: unknown): { price: number; priceMin?: number; priceMax?: number } {
+    if (typeof priceInput === 'number') {
+        if (!Number.isFinite(priceInput)) throw new Error('Invalid price');
+        return { price: priceInput };
+    }
+
+    if (typeof priceInput === 'string') {
+        const raw = priceInput.trim();
+        const single = raw.match(/^\d+(?:\.\d+)?$/);
+        if (single) {
+            const p = Number(raw);
+            if (!Number.isFinite(p)) throw new Error('Invalid price');
+            return { price: p };
+        }
+
+        const range = raw.match(/^(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)$/);
+        if (range) {
+            const min = Number(range[1]);
+            const max = Number(range[2]);
+            if (!Number.isFinite(min) || !Number.isFinite(max) || min < 0 || max < 0 || min > max) {
+                throw new Error('Invalid price range');
+            }
+            return { price: min, priceMin: min, priceMax: max };
+        }
+
+        throw new Error('Invalid price format');
+    }
+
+    throw new Error('Invalid price');
+}
+
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
@@ -56,7 +87,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
         const { id } = await params;
         const body = await req.json();
-        const { name, duration, price } = body;
+        const { name, duration, price, isActive } = body;
 
         if (!id) return NextResponse.json({ message: "Service id is required" }, { status: 400 });
 
@@ -66,13 +97,22 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
         service.name = name || service.name;
         service.duration = duration !== undefined ? duration : service.duration;
-        service.price = price !== undefined ? price : service.price;
+        if (price !== undefined) {
+            const parsedPrice = parsePriceInput(price);
+            service.price = parsedPrice.price;
+            service.priceMin = parsedPrice.priceMin;
+            service.priceMax = parsedPrice.priceMax;
+        }
+        service.isActive = isActive !== undefined ? Boolean(isActive) : service.isActive;
         await service.save();
 
         return NextResponse.json({ message: "Service updated successfully", service });
 
     } catch (error) {
         console.error("Error updating service:", error);
+        if (error instanceof Error && /price/i.test(error.message)) {
+            return NextResponse.json({ message: error.message }, { status: 400 });
+        }
         return NextResponse.json({ message: "Internal server error" }, { status: 500 });
     }
 }

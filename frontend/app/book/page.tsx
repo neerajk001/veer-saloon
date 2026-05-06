@@ -13,6 +13,8 @@ type Service = {
   name: string;
   duration: number; // in minutes
   price: number;
+  priceMin?: number;
+  priceMax?: number;
   isActive?: boolean;
 };
 
@@ -39,10 +41,27 @@ export default function BookingPage() {
   const [activeClosure, setActiveClosure] = useState<any>(null);
 
   // Selection State
-  const [selectedService, setSelectedService] = useState<Service | null>(null);
+  const [selectedServices, setSelectedServices] = useState<Service[]>([]);
   const [selectedDate, setSelectedDate] = useState<{ day: string; date: string; fullDate: string } | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [details, setDetails] = useState({ name: "", phone: "" });
+
+  const totalDuration = selectedServices.reduce((sum, s) => sum + (Number(s.duration) || 0), 0);
+
+  const getServicePriceLabel = (service: Service): string => {
+    const min = typeof service.priceMin === 'number' ? service.priceMin : undefined;
+    const max = typeof service.priceMax === 'number' ? service.priceMax : undefined;
+    if (min !== undefined && max !== undefined && min !== max) return `₹${min} - ₹${max}`;
+    return `₹${service.price}`;
+  };
+
+  const hasAnyPriceRange = selectedServices.some((s) => {
+    const min = typeof s.priceMin === 'number' ? s.priceMin : undefined;
+    const max = typeof s.priceMax === 'number' ? s.priceMax : undefined;
+    return min !== undefined && max !== undefined && min !== max;
+  });
+
+  const totalFixedPrice = selectedServices.reduce((sum, s) => sum + (Number(s.price) || 0), 0);
 
   // --- 1. Fetch Services & Generate Dates on Mount ---
   useEffect(() => {
@@ -136,13 +155,17 @@ export default function BookingPage() {
 
   // --- 2. Fetch Slots when Service or Date changes ---
   useEffect(() => {
-    if (selectedService && selectedDate) {
+    if (selectedServices.length > 0 && selectedDate) {
       fetchSlots();
+    } else {
+      setSlots([]);
+      setClosureReason("");
+      setSelectedSlot(null);
     }
-  }, [selectedDate, selectedService]);
+  }, [selectedDate, selectedServices]);
 
   const fetchSlots = async () => {
-    if (!selectedService || !selectedDate) return;
+    if (selectedServices.length === 0 || !selectedDate) return;
     try {
       setSlots([]);
       setClosureReason("");
@@ -151,7 +174,7 @@ export default function BookingPage() {
       const res = await axios.get(`${API_URL}/appointments/slots`, {
         params: {
           date: selectedDate.fullDate,
-          serviceId: selectedService._id,
+          serviceIds: selectedServices.map(s => s._id).join(','),
         },
       });
 
@@ -169,9 +192,12 @@ export default function BookingPage() {
     }
   };
 
-  const handleServiceSelect = (service: Service) => {
-    setSelectedService(service);
-    setSelectedSlot(null); // Reset slot when service changes
+  const handleServiceToggle = (service: Service) => {
+    setSelectedServices((prev) => {
+      const exists = prev.some((s) => s._id === service._id);
+      return exists ? prev.filter((s) => s._id !== service._id) : [...prev, service];
+    });
+    setSelectedSlot(null); // Reset slot when service selection changes
     setError("");
   };
 
@@ -188,8 +214,8 @@ export default function BookingPage() {
 
   const handleConfirm = async () => {
     // Validation
-    if (!selectedService) {
-      setError("Please select a service.");
+    if (selectedServices.length === 0) {
+      setError("Please select at least one service.");
       return;
     }
     if (!selectedSlot) {
@@ -212,7 +238,7 @@ export default function BookingPage() {
         customername: details.name,
         phoneNumber: details.phone,
         date: selectedDate?.fullDate,
-        serviceId: selectedService._id,
+        serviceIds: selectedServices.map(s => s._id),
         startTime: selectedSlot,
       });
 
@@ -253,7 +279,7 @@ export default function BookingPage() {
   };
 
   // Check if form is complete
-  const isFormComplete = selectedService && selectedSlot && details.name.trim() && details.phone.trim();
+  const isFormComplete = selectedServices.length > 0 && selectedSlot && details.name.trim() && details.phone.trim();
 
   if (activeClosure) {
     return (
@@ -373,7 +399,7 @@ export default function BookingPage() {
           {/* Section 1: Select Service */}
           <section className="mb-12">
             <div className="flex items-center gap-3 mb-6">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-colors ${selectedService ? 'bg-black text-white border-black' : 'bg-white text-gray-400 border-gray-200'}`}>
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-colors ${selectedServices.length > 0 ? 'bg-black text-white border-black' : 'bg-white text-gray-400 border-gray-200'}`}>
                 1
               </div>
               <h2 className="text-xl font-bold uppercase tracking-tight">Select Service</h2>
@@ -386,32 +412,41 @@ export default function BookingPage() {
             ) : services.length === 0 ? (
               <p className="text-center text-gray-500 py-8 bg-gray-50 rounded-xl border border-dashed border-gray-200">No services available.</p>
             ) : (
-              <div className="flex flex-col gap-3">
+              <div className="bg-white">
+                <div className="max-h-72 overflow-y-auto pr-2">
+                  <div className="flex flex-col gap-3">
                 {services.map((service) => {
-                  const isSelected = selectedService?._id === service._id;
+                  const isSelected = selectedServices.some((s) => s._id === service._id);
                   return (
-                    <button
+                    <label
                       key={service._id}
-                      onClick={() => handleServiceSelect(service)}
-                      className={`group relative w-full p-5 flex items-center justify-between text-left transition-all duration-300 border-b border-gray-100 hover:bg-gray-50
+                      className={`group relative w-full p-5 flex items-center justify-between text-left transition-all duration-300 border-b border-gray-100 hover:bg-gray-50 cursor-pointer
                       ${isSelected
                           ? 'bg-black text-white hover:bg-gray-900 border-transparent shadow-xl shadow-gray-200 transform scale-[1.02] rounded-xl'
                           : 'bg-white text-black'
                         }`}
                     >
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => handleServiceToggle(service)}
+                        className="sr-only"
+                      />
                       <div className="flex flex-col">
                         <span className={`font-bold text-lg tracking-tight ${isSelected ? 'text-white' : 'text-black'}`}>{service.name}</span>
                         <span className={`text-xs uppercase tracking-widest mt-1 ${isSelected ? 'text-gray-400' : 'text-gray-400'}`}>{service.duration} mins</span>
                       </div>
                       <div className="flex items-center gap-4">
-                        <span className={`font-bold text-xl ${isSelected ? 'text-white' : 'text-black'}`}>₹{service.price}</span>
+                        <span className={`font-bold text-xl ${isSelected ? 'text-white' : 'text-black'}`}>{getServicePriceLabel(service)}</span>
                         <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? 'border-orange-500 bg-orange-500' : 'border-gray-200'}`}>
                           {isSelected && <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
                         </div>
                       </div>
-                    </button>
+                    </label>
                   );
                 })}
+                  </div>
+                </div>
               </div>
             )}
           </section>
@@ -456,9 +491,9 @@ export default function BookingPage() {
               <h2 className="text-xl font-bold uppercase tracking-tight">Select Time <span className="text-sm font-medium text-gray-400 normal-case ml-2">Available Slots</span></h2>
             </div>
 
-            {!selectedService ? (
+            {selectedServices.length === 0 ? (
               <div className="bg-gray-50 border border-dashed border-gray-200 rounded-xl p-8 text-center text-gray-400">
-                Please select a service first
+                Please select service(s) first
               </div>
             ) : loadingSlots ? (
               <div className="flex items-center justify-center py-8">
@@ -552,7 +587,7 @@ export default function BookingPage() {
           </section>
 
           {/* Summary Card */}
-          {selectedService && (
+          {selectedServices.length > 0 && (
             <section className="mb-8 animate-in fade-in slide-in-from-bottom-4">
               <div className="bg-gray-50 p-6 rounded-none border-l-4 border-black">
                 <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Summary</h3>
@@ -560,11 +595,11 @@ export default function BookingPage() {
                 <div className="space-y-3">
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-gray-500">Service</span>
-                    <span className="font-bold text-black">{selectedService.name}</span>
+                    <span className="font-bold text-black">{selectedServices.map(s => s.name).join(', ')}</span>
                   </div>
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-gray-500">Duration</span>
-                    <span className="font-bold text-black">{selectedService.duration} min</span>
+                    <span className="font-bold text-black">{totalDuration} min</span>
                   </div>
                   {selectedDate && (
                     <div className="flex justify-between items-center text-sm">
@@ -582,7 +617,7 @@ export default function BookingPage() {
                     <div className="flex justify-between items-center">
                       <span className="text-lg font-black uppercase tracking-tight text-black">Total</span>
                       <span className="text-2xl font-black text-black">
-                        ₹{selectedService.price}
+                        {hasAnyPriceRange ? 'Varies' : `₹${totalFixedPrice}`}
                       </span>
                     </div>
                   </div>
