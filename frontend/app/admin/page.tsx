@@ -251,7 +251,10 @@ export default function AdminPage() {
     if (activeTab === 'services') fetchServices();
     if (activeTab === 'appointments') fetchAppointments();
     if (activeTab === 'settings') fetchConfig();
-    if (activeTab === 'blocked') fetchBlockedSlots();
+    if (activeTab === 'blocked') {
+      fetchBlockedSlots();
+      fetchConfig();
+    }
     if (activeTab === 'users') fetchUsers();
   }, [activeTab, selectedDate]);
 
@@ -700,6 +703,13 @@ export default function AdminPage() {
     blockedSlots: blockedSlots.length,
     totalUsers: users.length
   };
+
+  const activeShiftTimeOptions = TIME_OPTIONS_5MIN.filter(t => {
+    const { morningSlot, eveningSlot } = config;
+    const inMorning = morningSlot?.openingTime && morningSlot?.closingTime && t >= morningSlot.openingTime && t <= morningSlot.closingTime;
+    const inEvening = eveningSlot?.openingTime && eveningSlot?.closingTime && t >= eveningSlot.openingTime && t <= eveningSlot.closingTime;
+    return inMorning || inEvening;
+  });
 
   return (
     <div className="min-h-screen bg-[#f8fafc] text-gray-900">
@@ -1445,7 +1455,7 @@ export default function AdminPage() {
                         const end = quickBlockSlot.endTime && start && quickBlockSlot.endTime <= start ? '' : quickBlockSlot.endTime;
                         setQuickBlockSlot({ ...quickBlockSlot, startTime: start, endTime: end });
                       }}
-                      options={TIME_OPTIONS_5MIN}
+                      options={activeShiftTimeOptions}
                       placeholder="Select"
                     />
                   </div>
@@ -1454,7 +1464,7 @@ export default function AdminPage() {
                     <TimeSelect
                       value={quickBlockSlot.endTime}
                       onChange={(endTime) => setQuickBlockSlot({ ...quickBlockSlot, endTime })}
-                      options={TIME_OPTIONS_5MIN.filter((t) => !quickBlockSlot.startTime || t > quickBlockSlot.startTime)}
+                      options={activeShiftTimeOptions.filter((t) => !quickBlockSlot.startTime || t > quickBlockSlot.startTime)}
                       placeholder="Select"
                     />
                   </div>
@@ -1534,7 +1544,7 @@ export default function AdminPage() {
                           const end = newBlockedSlot.endTime && start && newBlockedSlot.endTime <= start ? '' : newBlockedSlot.endTime;
                           setNewBlockedSlot({ ...newBlockedSlot, startTime: start, endTime: end });
                         }}
-                        options={TIME_OPTIONS_5MIN}
+                        options={activeShiftTimeOptions}
                         placeholder="Select start"
                       />
                     </div>
@@ -1545,7 +1555,7 @@ export default function AdminPage() {
                       <TimeSelect
                         value={newBlockedSlot.endTime}
                         onChange={(endTime) => setNewBlockedSlot({ ...newBlockedSlot, endTime })}
-                        options={TIME_OPTIONS_5MIN.filter((t) => !newBlockedSlot.startTime || t > newBlockedSlot.startTime)}
+                        options={activeShiftTimeOptions.filter((t) => !newBlockedSlot.startTime || t > newBlockedSlot.startTime)}
                         placeholder="Select end"
                       />
                     </div>
