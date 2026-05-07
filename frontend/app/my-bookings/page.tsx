@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSession, signIn } from 'next-auth/react';
 import axios from 'axios';
+import { formatDuration } from '@/lib/utils';
 
 interface Booking {
     _id: string;
@@ -217,7 +218,7 @@ export default function MyBookingsPage() {
                                                             ? booking.serviceIds.reduce((sum, s) => sum + (Number(s.duration) || 0), 0)
                                                             : (Number(booking.serviceId?.duration) || 0);
                                                         return totalMins ? (
-                                                            <p className="text-xs text-gray-500 mt-0.5">{totalMins} mins</p>
+                                                            <p className="text-xs text-gray-500 mt-0.5">{formatDuration(totalMins)}</p>
                                                         ) : null;
                                                     })()}
                                                 </div>

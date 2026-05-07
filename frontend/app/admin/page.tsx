@@ -5,6 +5,7 @@ import axios from 'axios';
 import Link from 'next/link';
 import { useSession, signOut } from 'next-auth/react';
 import { isAdminEmail } from '@/lib/admin';
+import { formatDuration } from '@/lib/utils';
 
 const API_URL = '/api';
 
@@ -954,7 +955,7 @@ export default function AdminPage() {
                               ) : (
                                 <span className="inline-flex items-center gap-2">
                                   <span className="w-2 h-2 rounded-full bg-gray-300"></span>
-                                  {service.duration} mins
+                                  {formatDuration(service.duration)}
                                 </span>
                               )}
                             </td>
@@ -1095,7 +1096,7 @@ export default function AdminPage() {
                           <div className="flex items-center gap-3 mt-1 text-sm text-gray-500 flex-wrap">
                             <span className="font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">{formatServicePrice(service)}</span>
                             <span>•</span>
-                            <span>{service.duration} mins</span>
+                            <span>{formatDuration(service.duration)}</span>
                             <span>•</span>
                             <span className={`px-2 py-0.5 rounded-md text-xs font-semibold ${service.isActive === false ? 'bg-gray-100 text-gray-500' : 'bg-green-50 text-green-700'}`}>
                               {service.isActive === false ? 'Inactive' : 'Active'}

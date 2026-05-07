@@ -6,6 +6,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import { useSession, signIn } from "next-auth/react";
+import { formatDuration } from "@/lib/utils";
 
 // --- Types ---
 type Service = {
@@ -434,7 +435,7 @@ export default function BookingPage() {
                       />
                       <div className="flex flex-col">
                         <span className={`font-bold text-lg tracking-tight ${isSelected ? 'text-white' : 'text-black'}`}>{service.name}</span>
-                        <span className={`text-xs uppercase tracking-widest mt-1 ${isSelected ? 'text-gray-400' : 'text-gray-400'}`}>{service.duration} mins</span>
+                        <span className={`text-xs uppercase tracking-widest mt-1 ${isSelected ? 'text-gray-400' : 'text-gray-400'}`}>{formatDuration(service.duration)}</span>
                       </div>
                       <div className="flex items-center gap-4">
                         <span className={`font-bold text-xl ${isSelected ? 'text-white' : 'text-black'}`}>{getServicePriceLabel(service)}</span>
@@ -599,7 +600,7 @@ export default function BookingPage() {
                   </div>
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-gray-500">Duration</span>
-                    <span className="font-bold text-black">{totalDuration} min</span>
+                    <span className="font-bold text-black">{formatDuration(totalDuration)}</span>
                   </div>
                   {selectedDate && (
                     <div className="flex justify-between items-center text-sm">
