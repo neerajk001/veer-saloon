@@ -411,6 +411,18 @@ export default function AdminPage() {
     }
   };
 
+  const deleteAppointment = async (id: string) => {
+    if (!window.confirm('Are you sure you want to completely delete this appointment?')) return;
+    try {
+      await axios.delete(`${API_URL}/appointments/${id}`);
+      showMessage('success', 'Appointment deleted');
+      fetchAppointments();
+    } catch (error) {
+      console.error('Error deleting appointment:', error);
+      showMessage('error', 'Failed to delete appointment');
+    }
+  };
+
   const updateAppointmentStatus = async (id: string, status: string) => {
     try {
       // Try to update - if endpoint doesn't exist, we'll handle it
@@ -1170,25 +1182,34 @@ export default function AdminPage() {
                             {apt.status}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-right space-x-2">
-                          {apt.status === 'scheduled' && (
-                            <div className="flex justify-end gap-2">
-                              <button
-                                onClick={() => updateAppointmentStatus(apt._id, 'completed')}
-                                className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                                title="Mark Complete"
-                              >
-                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-                              </button>
-                              <button
-                                onClick={() => updateAppointmentStatus(apt._id, 'canceled')}
-                                className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                title="Cancel"
-                              >
-                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
-                              </button>
-                            </div>
-                          )}
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex justify-end gap-2">
+                            {apt.status === 'scheduled' && (
+                              <>
+                                <button
+                                  onClick={() => updateAppointmentStatus(apt._id, 'completed')}
+                                  className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                                  title="Mark Complete"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                                </button>
+                                <button
+                                  onClick={() => updateAppointmentStatus(apt._id, 'canceled')}
+                                  className="p-1.5 text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
+                                  title="Cancel"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+                                </button>
+                              </>
+                            )}
+                            <button
+                              onClick={() => deleteAppointment(apt._id)}
+                              className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Delete Appointment"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -1213,13 +1234,24 @@ export default function AdminPage() {
                           to {formatTime(apt.endTime)}
                         </div>
                       </div>
-                      <span
-                        className={`px-3 py-1 inline-flex text-xs font-semibold rounded-full ${getStatusColor(
-                          apt.status
-                        )}`}
-                      >
-                        {apt.status}
-                      </span>
+                      <div className="flex flex-col items-end gap-2">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`px-3 py-1 inline-flex text-xs font-semibold rounded-full ${getStatusColor(
+                              apt.status
+                            )}`}
+                          >
+                            {apt.status}
+                          </span>
+                          <button
+                            onClick={() => deleteAppointment(apt._id)}
+                            className="p-1.5 text-red-500 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+                            title="Delete Appointment"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+                          </button>
+                        </div>
+                      </div>
                     </div>
 
                     <div className="space-y-3 border-t border-gray-100 pt-4">
@@ -1235,7 +1267,7 @@ export default function AdminPage() {
 
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-500">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="6" r="3"></circle><circle cx="6" cy="18" r="3"></circle><line x1="20" y1="4" x2="8.12" y2="15.88"></line><line x1="14.47" y1="14.48" x2="20" y2="20"></line><line x1="8.12" y1="8.12" x2="12" y2="12"></line></svg>
                         </div>
                         <div className="text-sm font-medium text-gray-700">
                           {(apt.serviceIds?.length
@@ -1283,30 +1315,32 @@ export default function AdminPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Opens At</label>
-                      <input
-                        type="time"
+                      <TimeSelect
                         value={config.morningSlot.openingTime}
-                        onChange={(e) =>
+                        onChange={(val) =>
                           setConfig({
                             ...config,
-                            morningSlot: { ...config.morningSlot, openingTime: e.target.value },
+                            morningSlot: { ...config.morningSlot, openingTime: val },
                           })
                         }
-                        className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
+                        options={TIME_OPTIONS_5MIN}
+                        placeholder="Select time"
+                        className="w-full"
                       />
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Closes At</label>
-                      <input
-                        type="time"
+                      <TimeSelect
                         value={config.morningSlot.closingTime}
-                        onChange={(e) =>
+                        onChange={(val) =>
                           setConfig({
                             ...config,
-                            morningSlot: { ...config.morningSlot, closingTime: e.target.value },
+                            morningSlot: { ...config.morningSlot, closingTime: val },
                           })
                         }
-                        className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
+                        options={TIME_OPTIONS_5MIN}
+                        placeholder="Select time"
+                        className="w-full"
                       />
                     </div>
                   </div>
@@ -1320,30 +1354,32 @@ export default function AdminPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Opens At</label>
-                      <input
-                        type="time"
+                      <TimeSelect
                         value={config.eveningSlot.openingTime}
-                        onChange={(e) =>
+                        onChange={(val) =>
                           setConfig({
                             ...config,
-                            eveningSlot: { ...config.eveningSlot, openingTime: e.target.value },
+                            eveningSlot: { ...config.eveningSlot, openingTime: val },
                           })
                         }
-                        className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
+                        options={TIME_OPTIONS_5MIN}
+                        placeholder="Select time"
+                        className="w-full"
                       />
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Closes At</label>
-                      <input
-                        type="time"
+                      <TimeSelect
                         value={config.eveningSlot.closingTime}
-                        onChange={(e) =>
+                        onChange={(val) =>
                           setConfig({
                             ...config,
-                            eveningSlot: { ...config.eveningSlot, closingTime: e.target.value },
+                            eveningSlot: { ...config.eveningSlot, closingTime: val },
                           })
                         }
-                        className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
+                        options={TIME_OPTIONS_5MIN}
+                        placeholder="Select time"
+                        className="w-full"
                       />
                     </div>
                   </div>
