@@ -5,6 +5,8 @@ import { requireAdmin } from '@/lib/adminAuth';
 import dbConnect from '@/lib/mongodb';
 import Appointment from '@/models/Appointment';
 
+const CANCELLATION_BUFFER_MINUTES = 15;
+
 // ─── PATCH: User-facing cancellation ───────────────────────────────────────
 // Only the owner of the appointment can cancel it.
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -33,6 +35,19 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         if (appointment.status !== 'scheduled') {
             return NextResponse.json({
                 message: `Cannot cancel a booking that is already '${appointment.status}'.`
+            }, { status: 422 });
+        }
+
+        const startTime = new Date(appointment.startTime);
+        if (isNaN(startTime.getTime())) {
+            return NextResponse.json({ message: "Invalid appointment start time." }, { status: 422 });
+        }
+
+        const cancellationCutoff = new Date(startTime.getTime() - CANCELLATION_BUFFER_MINUTES * 60 * 1000);
+        const now = new Date();
+        if (now > cancellationCutoff) {
+            return NextResponse.json({
+                message: "Cancellation window closed. You can cancel only up to 15 minutes before the appointment time."
             }, { status: 422 });
         }
 
@@ -70,6 +85,18 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         }
 
         await dbConnect();
+        const existing = await Appointment.findById(id);
+        if (!existing) {
+            return NextResponse.json({ message: "Appointment not found" }, { status: 404 });
+        }
+
+        // Prevent marking future slots as completed, which can reopen the same time for rebooking.
+        if (status === 'completed' && existing.endTime && new Date(existing.endTime) > new Date()) {
+            return NextResponse.json({
+                message: "Cannot mark this appointment completed before its end time."
+            }, { status: 422 });
+        }
+
         const appointment = await Appointment.findByIdAndUpdate(
             id,
             { status },
@@ -77,10 +104,6 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         )
             .populate("serviceIds", "name duration")
             .populate("serviceId", "name duration");
-
-        if (!appointment) {
-            return NextResponse.json({ message: "Appointment not found" }, { status: 404 });
-        }
 
         return NextResponse.json({
             message: "Appointment updated successfully",

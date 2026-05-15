@@ -5,6 +5,12 @@ const serviceSchema = new Schema({
         type: String,
         required: true
     },
+    serviceType: {
+        type: String,
+        enum: ['single', 'package'],
+        default: 'single',
+        index: true
+    },
     price: {
         type: Number,
         required: true
@@ -23,11 +29,32 @@ const serviceSchema = new Schema({
         type: Number,
         required: true
     },
+    // Only for package services. Contains the included single services.
+    packageServiceIds: [{
+        type: Schema.Types.ObjectId,
+        ref: 'Service'
+    }],
     isActive: {
         type: Boolean,
         default: true
     }
 }, { timestamps: true });
 
-const Service = mongoose.models.Service || mongoose.model('Service', serviceSchema);
+const existingModel = mongoose.models.Service as mongoose.Model<any> | undefined;
+let Service: mongoose.Model<any>;
+
+// During Next.js dev hot reload, an older compiled model can linger in memory.
+// If package fields are missing, recreate the model with the latest schema.
+if (existingModel) {
+    const hasServiceType = !!existingModel.schema.path('serviceType');
+    const hasPackageServiceIds = !!existingModel.schema.path('packageServiceIds');
+    if (!hasServiceType || !hasPackageServiceIds) {
+        delete mongoose.models.Service;
+        Service = mongoose.model('Service', serviceSchema);
+    } else {
+        Service = existingModel;
+    }
+} else {
+    Service = mongoose.model('Service', serviceSchema);
+}
 export default Service;

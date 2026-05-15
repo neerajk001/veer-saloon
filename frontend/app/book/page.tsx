@@ -16,6 +16,8 @@ type Service = {
   price: number;
   priceMin?: number;
   priceMax?: number;
+  serviceType?: 'single' | 'package';
+  packageServiceIds?: Array<{ _id: string; name: string } | string>;
   isActive?: boolean;
 };
 
@@ -25,6 +27,7 @@ type SlotItem = {
 };
 
 const API_URL = "/api";
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export default function BookingPage() {
   const { data: session, status } = useSession();
@@ -43,6 +46,7 @@ export default function BookingPage() {
 
   // Selection State
   const [selectedServices, setSelectedServices] = useState<Service[]>([]);
+  const [serviceCatalogView, setServiceCatalogView] = useState<'single' | 'package'>('single');
   const [selectedDate, setSelectedDate] = useState<{ day: string; date: string; fullDate: string } | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [details, setDetails] = useState({ name: "", phone: "" });
@@ -56,6 +60,14 @@ export default function BookingPage() {
     return `₹${service.price}`;
   };
 
+  const getPackageIncludes = (service: Service): string => {
+    if (!Array.isArray(service.packageServiceIds)) return '';
+    return service.packageServiceIds
+      .map((item) => (typeof item === 'string' ? '' : item?.name || ''))
+      .filter(Boolean)
+      .join(', ');
+  };
+
   const hasAnyPriceRange = selectedServices.some((s) => {
     const min = typeof s.priceMin === 'number' ? s.priceMin : undefined;
     const max = typeof s.priceMax === 'number' ? s.priceMax : undefined;
@@ -63,6 +75,18 @@ export default function BookingPage() {
   });
 
   const totalFixedPrice = selectedServices.reduce((sum, s) => sum + (Number(s.price) || 0), 0);
+  const singleServices = services.filter((s) => (s.serviceType || 'single') !== 'package');
+  const packageServices = services.filter((s) => s.serviceType === 'package');
+  const hasBothServiceTypes = singleServices.length > 0 && packageServices.length > 0;
+  const visibleCatalogServices = serviceCatalogView === 'package' ? packageServices : singleServices;
+
+  useEffect(() => {
+    if (serviceCatalogView === 'package' && packageServices.length === 0 && singleServices.length > 0) {
+      setServiceCatalogView('single');
+    } else if (serviceCatalogView === 'single' && singleServices.length === 0 && packageServices.length > 0) {
+      setServiceCatalogView('package');
+    }
+  }, [serviceCatalogView, singleServices.length, packageServices.length]);
 
   // --- 1. Fetch Services & Generate Dates on Mount ---
   useEffect(() => {
@@ -100,11 +124,18 @@ export default function BookingPage() {
   const fetchServices = async () => {
     try {
       setLoading(true);
-      const res = await axios.get(`${API_URL}/services/all`);
+      let res;
+      try {
+        res = await axios.get(`${API_URL}/services/all`);
+      } catch (firstErr) {
+        // Retry once for transient API/database DNS failures.
+        await sleep(700);
+        res = await axios.get(`${API_URL}/services/all`);
+      }
       setServices(res.data.services || []);
     } catch (err) {
       console.error("Failed to fetch services", err);
-      setError("Could not load services. Please try again.");
+      setError("Could not load services right now. Please try again in a moment.");
     } finally {
       setLoading(false);
     }
@@ -141,8 +172,8 @@ export default function BookingPage() {
     const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-    // Booking open for tomorrow and day after tomorrow only (not today)
-    for (let i = 1; i <= 2; i++) {
+    // Booking open for today, tomorrow, and day after tomorrow
+    for (let i = 0; i <= 2; i++) {
       const d = new Date(today);
       d.setDate(today.getDate() + i);
       const dayName = days[d.getDay()];
@@ -414,38 +445,74 @@ export default function BookingPage() {
               <p className="text-center text-gray-500 py-8 bg-gray-50 rounded-xl border border-dashed border-gray-200">No services available.</p>
             ) : (
               <div className="bg-white">
-                <div className="max-h-72 overflow-y-auto pr-2">
-                  <div className="flex flex-col gap-3">
-                {services.map((service) => {
-                  const isSelected = selectedServices.some((s) => s._id === service._id);
-                  return (
-                    <label
-                      key={service._id}
-                      className={`group relative w-full p-5 flex items-center justify-between text-left transition-all duration-300 border-b border-gray-100 hover:bg-gray-50 cursor-pointer
-                      ${isSelected
-                          ? 'bg-black text-white hover:bg-gray-900 border-transparent shadow-xl shadow-gray-200 transform scale-[1.02] rounded-xl'
-                          : 'bg-white text-black'
+                {hasBothServiceTypes && (
+                  <div className="mb-4 w-full rounded-2xl border border-gray-300 bg-gradient-to-r from-gray-50 to-white p-2 shadow-sm">
+                    <div className="mb-2 px-1 text-[11px] font-bold uppercase tracking-widest text-gray-500">Browse By Type</div>
+                    <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setServiceCatalogView('single')}
+                      className={`px-4 py-2.5 rounded-xl text-sm font-bold transition-all border ${serviceCatalogView === 'single'
+                        ? 'bg-black text-white border-black shadow-md'
+                        : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'
                         }`}
                     >
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => handleServiceToggle(service)}
-                        className="sr-only"
-                      />
-                      <div className="flex flex-col">
-                        <span className={`font-bold text-lg tracking-tight ${isSelected ? 'text-white' : 'text-black'}`}>{service.name}</span>
-                        <span className={`text-xs uppercase tracking-widest mt-1 ${isSelected ? 'text-gray-400' : 'text-gray-400'}`}>{formatDuration(service.duration)}</span>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <span className={`font-bold text-xl ${isSelected ? 'text-white' : 'text-black'}`}>{getServicePriceLabel(service)}</span>
-                        <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? 'border-orange-500 bg-orange-500' : 'border-gray-200'}`}>
-                          {isSelected && <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
-                        </div>
-                      </div>
-                    </label>
-                  );
-                })}
+                      Single Services ({singleServices.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setServiceCatalogView('package')}
+                      className={`px-4 py-2.5 rounded-xl text-sm font-bold transition-all border ${serviceCatalogView === 'package'
+                        ? 'bg-black text-white border-black shadow-md'
+                        : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'
+                        }`}
+                    >
+                      Packages ({packageServices.length})
+                    </button>
+                    </div>
+                  </div>
+                )}
+                <div className="max-h-72 overflow-y-auto pr-2">
+                  <div className="flex flex-col gap-3">
+                    <div className="px-1 text-xs font-extrabold uppercase tracking-widest text-gray-500">
+                      {serviceCatalogView === 'package' ? 'Packages' : 'Single Services'}
+                    </div>
+                    {visibleCatalogServices.map((service) => {
+                      const isSelected = selectedServices.some((s) => s._id === service._id);
+                      const includes = serviceCatalogView === 'package' ? getPackageIncludes(service) : '';
+                      return (
+                        <label
+                          key={service._id}
+                          className={`group relative w-full p-5 flex items-center justify-between text-left transition-all duration-300 border-b border-gray-100 hover:bg-gray-50 cursor-pointer
+                          ${isSelected
+                              ? 'bg-black text-white hover:bg-gray-900 border-transparent shadow-xl shadow-gray-200 transform scale-[1.02] rounded-xl'
+                              : 'bg-white text-black'
+                            }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => handleServiceToggle(service)}
+                            className="sr-only"
+                          />
+                          <div className="flex flex-col">
+                            <span className={`font-bold text-lg tracking-tight ${isSelected ? 'text-white' : 'text-black'}`}>{service.name}</span>
+                            <span className={`text-xs uppercase tracking-widest mt-1 ${isSelected ? 'text-gray-400' : 'text-gray-400'}`}>{formatDuration(service.duration)}</span>
+                            {includes && (
+                              <span className={`text-xs mt-2 font-medium ${isSelected ? 'text-gray-100' : 'text-gray-700'}`}>
+                                Includes: {includes}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <span className={`font-bold text-xl ${isSelected ? 'text-white' : 'text-black'}`}>{getServicePriceLabel(service)}</span>
+                            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? 'border-orange-500 bg-orange-500' : 'border-gray-200'}`}>
+                              {isSelected && <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                            </div>
+                          </div>
+                        </label>
+                      );
+                    })}
                   </div>
                 </div>
               </div>

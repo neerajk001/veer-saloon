@@ -97,6 +97,8 @@ interface Service {
   priceMin?: number;
   priceMax?: number;
   duration: number;
+  serviceType?: 'single' | 'package';
+  packageServiceIds?: Array<{ _id: string; name: string } | string>;
   isActive?: boolean;
 }
 
@@ -160,9 +162,16 @@ export default function AdminPage() {
 
   // Services State
   const [services, setServices] = useState<Service[]>([]);
-  const [newService, setNewService] = useState({ name: '', price: '', duration: '' });
+  const [newService, setNewService] = useState({
+    name: '',
+    price: '',
+    duration: '',
+    serviceType: 'single' as 'single' | 'package',
+    packageServiceIds: [] as string[],
+  });
   const [editingServiceId, setEditingServiceId] = useState<string | null>(null);
   const [editService, setEditService] = useState<{ name: string; price: string; duration: string; isActive: boolean } | null>(null);
+  const [serviceListView, setServiceListView] = useState<'all' | 'single' | 'package'>('all');
 
   // Appointments State
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -299,20 +308,46 @@ export default function AdminPage() {
 
   const createService = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newService.name || !newService.price || !newService.duration) {
-      showMessage('error', 'Please fill all fields');
+    if (!newService.name.trim()) {
+      showMessage('error', 'Please enter a name');
       return;
     }
 
     try {
-      await axios.post(`${API_URL}/services/create`, {
-        name: newService.name,
-        price: newService.price,
-        duration: parseInt(newService.duration),
-        isActive: true,
-      });
+      const payload = newService.serviceType === 'package'
+        ? {
+          name: newService.name.trim(),
+          serviceType: 'package',
+          packageServiceIds: newService.packageServiceIds,
+          isActive: true,
+        }
+        : {
+          name: newService.name.trim(),
+          price: newService.price,
+          duration: parseInt(newService.duration),
+          serviceType: 'single',
+          isActive: true,
+        };
+
+      if (newService.serviceType === 'package') {
+        if (newService.packageServiceIds.length < 2) {
+          showMessage('error', 'Please select at least 2 services for a package');
+          return;
+        }
+      } else if (!newService.price || !newService.duration) {
+        showMessage('error', 'Please fill price and duration');
+        return;
+      }
+
+      await axios.post(`${API_URL}/services/create`, payload);
       showMessage('success', 'Service created successfully');
-      setNewService({ name: '', price: '', duration: '' });
+      setNewService({
+        name: '',
+        price: '',
+        duration: '',
+        serviceType: 'single',
+        packageServiceIds: [],
+      });
       fetchServices();
     } catch (error) {
       console.error('Error creating service:', error);
@@ -332,6 +367,32 @@ export default function AdminPage() {
     const max = typeof service.priceMax === 'number' ? service.priceMax : undefined;
     if (min !== undefined && max !== undefined && min !== max) return `${min} - ${max}`;
     return String(service.price ?? '');
+  };
+
+  const packageBaseServices = services.filter((s) => (s.serviceType || 'single') !== 'package');
+  const singleTypeServices = services.filter((s) => (s.serviceType || 'single') !== 'package');
+  const packageTypeServices = services.filter((s) => s.serviceType === 'package');
+  const visibleServices = serviceListView === 'single'
+    ? singleTypeServices
+      : serviceListView === 'package'
+      ? packageTypeServices
+      : services;
+
+  const selectedPackageServices = packageBaseServices.filter((s) => newService.packageServiceIds.includes(s._id));
+  const packageDurationTotal = selectedPackageServices.reduce((sum, s) => sum + (Number(s.duration) || 0), 0);
+  const packageMinPriceTotal = selectedPackageServices.reduce((sum, s) => sum + (Number((typeof s.priceMin === 'number' ? s.priceMin : s.price)) || 0), 0);
+  const packageMaxPriceTotal = selectedPackageServices.reduce((sum, s) => sum + (Number((typeof s.priceMax === 'number' ? s.priceMax : s.price)) || 0), 0);
+  const packagePriceDisplay = selectedPackageServices.length === 0
+    ? ''
+    : packageMinPriceTotal === packageMaxPriceTotal
+      ? `${packageMinPriceTotal}`
+      : `${packageMinPriceTotal} - ${packageMaxPriceTotal}`;
+
+  const getPackageServiceNames = (service: Service): string[] => {
+    if (!Array.isArray(service.packageServiceIds)) return [];
+    return service.packageServiceIds
+      .map((item) => (typeof item === 'string' ? '' : (item?.name || '')))
+      .filter(Boolean);
   };
 
   const deleteService = async (id: string) => {
@@ -865,49 +926,136 @@ export default function AdminPage() {
                 </div>
                 Add New Service
               </h3>
-              <form onSubmit={createService} className="flex flex-col md:flex-row gap-4">
-                <input
-                  type="text"
-                  placeholder="Service Name"
-                  value={newService.name}
-                  onChange={(e) => setNewService({ ...newService, name: e.target.value })}
-                  className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-                />
-                <input
-                  type="text"
-                  placeholder="Price (e.g., 300 or 300 - 400)"
-                  value={newService.price}
-                  onChange={(e) => setNewService({ ...newService, price: e.target.value })}
-                  className="w-full md:w-32 px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-                />
-                <input
-                  type="number"
-                  placeholder="Duration (min)"
-                  value={newService.duration}
-                  onChange={(e) => setNewService({ ...newService, duration: e.target.value })}
-                  className="w-full md:w-40 px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-                />
+              <form onSubmit={createService} className="space-y-4">
+                <div className="inline-flex rounded-xl border border-gray-200 p-1 bg-gray-50">
+                  <button
+                    type="button"
+                    onClick={() => setNewService((prev) => ({ ...prev, serviceType: 'single', packageServiceIds: [] }))}
+                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${newService.serviceType === 'single' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}
+                  >
+                    Single Service
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNewService((prev) => ({ ...prev, serviceType: 'package' }))}
+                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${newService.serviceType === 'package' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}
+                  >
+                    Package
+                  </button>
+                </div>
+
+                <div className="flex flex-col md:flex-row gap-4">
+                  <input
+                    type="text"
+                    placeholder={newService.serviceType === 'package' ? 'Package Name' : 'Service Name'}
+                    value={newService.name}
+                    onChange={(e) => setNewService({ ...newService, name: e.target.value })}
+                    className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                  />
+                  <input
+                    type="text"
+                    placeholder={newService.serviceType === 'package' ? 'Auto from selected services' : 'Price (e.g., 300 or 300 - 400)'}
+                    value={newService.serviceType === 'package' ? packagePriceDisplay : newService.price}
+                    onChange={(e) => setNewService({ ...newService, price: e.target.value })}
+                    readOnly={newService.serviceType === 'package'}
+                    className="w-full md:w-48 px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                  />
+                  <input
+                    type="number"
+                    placeholder={newService.serviceType === 'package' ? 'Auto duration (min)' : 'Duration (min)'}
+                    value={newService.serviceType === 'package' ? String(packageDurationTotal || '') : newService.duration}
+                    onChange={(e) => setNewService({ ...newService, duration: e.target.value })}
+                    readOnly={newService.serviceType === 'package'}
+                    className="w-full md:w-48 px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                  />
+                </div>
+
+                {newService.serviceType === 'package' && (
+                  <div className="border border-blue-100 bg-blue-50/50 rounded-xl p-4">
+                    <div className="text-sm font-semibold text-gray-800 mb-2">Select Services for This Package</div>
+                    {packageBaseServices.length === 0 ? (
+                      <p className="text-sm text-gray-500">Create single services first to build a package.</p>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
+                        {packageBaseServices.map((svc) => {
+                          const selected = newService.packageServiceIds.includes(svc._id);
+                          return (
+                            <label key={svc._id} className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm cursor-pointer ${selected ? 'border-blue-300 bg-white' : 'border-gray-200 bg-white/70'}`}>
+                              <input
+                                type="checkbox"
+                                checked={selected}
+                                onChange={() => {
+                                  setNewService((prev) => {
+                                    const exists = prev.packageServiceIds.includes(svc._id);
+                                    const nextIds = exists
+                                      ? prev.packageServiceIds.filter((id) => id !== svc._id)
+                                      : [...prev.packageServiceIds, svc._id];
+                                    return { ...prev, packageServiceIds: nextIds };
+                                  });
+                                }}
+                                className="h-4 w-4"
+                              />
+                              <span className="font-medium text-gray-800">{svc.name}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
+                    <p className="text-xs text-gray-500 mt-2">Pick at least 2 services. Price and duration are auto-calculated from selected services.</p>
+                  </div>
+                )}
+
                 <button
                   type="submit"
                   className="bg-blue-600 text-white px-8 py-3 rounded-xl hover:bg-blue-700 transition-colors font-semibold shadow-lg shadow-blue-200 active:scale-95"
                 >
-                  Add
+                  {newService.serviceType === 'package' ? 'Add Package' : 'Add Service'}
                 </button>
               </form>
+            </div>
+
+            <div className="mb-4 w-full rounded-2xl border border-gray-300 bg-gradient-to-r from-gray-50 to-white p-2 shadow-sm">
+              <div className="mb-2 px-1 text-[11px] font-bold uppercase tracking-widest text-gray-500">View Services By Type</div>
+              <div className="inline-flex rounded-xl border border-gray-200 p-1 bg-white">
+              <button
+                type="button"
+                onClick={() => setServiceListView('all')}
+                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all border ${serviceListView === 'all' ? 'bg-black text-white border-black shadow-sm' : 'text-gray-600 border-transparent hover:border-gray-300'}`}
+              >
+                All ({services.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setServiceListView('single')}
+                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all border ${serviceListView === 'single' ? 'bg-black text-white border-black shadow-sm' : 'text-gray-600 border-transparent hover:border-gray-300'}`}
+              >
+                Single ({singleTypeServices.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setServiceListView('package')}
+                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all border ${serviceListView === 'package' ? 'bg-black text-white border-black shadow-sm' : 'text-gray-600 border-transparent hover:border-gray-300'}`}
+              >
+                Package ({packageTypeServices.length})
+              </button>
+              </div>
             </div>
 
             {/* Services List - Desktop Table */}
             <div className="hidden md:block bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
               {loading ? (
                 <div className="p-12 text-center text-gray-500">Loading services...</div>
-              ) : services.length === 0 ? (
-                <div className="p-12 text-center text-gray-500">No services created yet.</div>
+              ) : visibleServices.length === 0 ? (
+                <div className="p-12 text-center text-gray-500">
+                  {serviceListView === 'package' ? 'No packages created yet.' : serviceListView === 'single' ? 'No single services yet.' : 'No services created yet.'}
+                </div>
               ) : (
                 <div className="max-h-[60vh] overflow-y-auto">
                   <table className="w-full">
                     <thead className="bg-gray-50 border-b border-gray-100 sticky top-0 z-10">
                       <tr>
                         <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Name</th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Type</th>
                         <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Price</th>
                         <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Duration</th>
                         <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Active</th>
@@ -915,7 +1063,7 @@ export default function AdminPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {services.map((service) => {
+                      {visibleServices.map((service) => {
                         const isEditing = editingServiceId === service._id;
                         return (
                           <tr key={service._id} className="hover:bg-gray-50 transition-colors align-top">
@@ -931,6 +1079,18 @@ export default function AdminPage() {
                                   <span>{service.name}</span>
                                 </div>
                               )}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-600">
+                              <div className="space-y-2">
+                                <span className={`px-2 py-1 rounded-full text-xs font-semibold ${service.serviceType === 'package' ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-700'}`}>
+                                  {service.serviceType === 'package' ? 'Package' : 'Single'}
+                                </span>
+                                {service.serviceType === 'package' && !isEditing && (
+                                  <div className="text-xs font-medium text-gray-700 max-w-56 truncate" title={getPackageServiceNames(service).join(', ')}>
+                                    Includes: {getPackageServiceNames(service).join(', ') || 'N/A'}
+                                  </div>
+                                )}
+                              </div>
                             </td>
                             <td className="px-6 py-4 text-sm font-medium text-blue-600">
                               {isEditing ? (
@@ -1027,10 +1187,12 @@ export default function AdminPage() {
             <div className="md:hidden grid grid-cols-1 gap-4">
               {loading ? (
                 <div className="p-8 text-center text-gray-500">Loading...</div>
-              ) : services.length === 0 ? (
-                <div className="p-8 text-center text-gray-500 bg-white rounded-2xl">No services yet</div>
+              ) : visibleServices.length === 0 ? (
+                <div className="p-8 text-center text-gray-500 bg-white rounded-2xl">
+                  {serviceListView === 'package' ? 'No packages yet' : serviceListView === 'single' ? 'No single services yet' : 'No services yet'}
+                </div>
               ) : (
-                services.map((service) => (
+                visibleServices.map((service) => (
                   <div key={service._id} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
                     {editingServiceId === service._id ? (
                       <div className="space-y-3">
@@ -1093,6 +1255,11 @@ export default function AdminPage() {
                       <div className="flex justify-between items-start">
                         <div>
                           <h4 className="font-semibold text-gray-900">{service.name}</h4>
+                          <div className="mt-1">
+                            <span className={`px-2 py-0.5 rounded-md text-xs font-semibold ${service.serviceType === 'package' ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-700'}`}>
+                              {service.serviceType === 'package' ? 'Package' : 'Single'}
+                            </span>
+                          </div>
                           <div className="flex items-center gap-3 mt-1 text-sm text-gray-500 flex-wrap">
                             <span className="font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">{formatServicePrice(service)}</span>
                             <span>•</span>
@@ -1102,6 +1269,11 @@ export default function AdminPage() {
                               {service.isActive === false ? 'Inactive' : 'Active'}
                             </span>
                           </div>
+                          {service.serviceType === 'package' && (
+                            <p className="text-xs font-medium text-gray-700 mt-2">
+                              Includes: {getPackageServiceNames(service).join(', ') || 'N/A'}
+                            </p>
+                          )}
                         </div>
                         <div className="flex items-center gap-2">
                           <button

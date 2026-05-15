@@ -64,7 +64,7 @@ export async function GET(req: Request) {
             SaloonConfig.findOne(),
             Appointment.find({
                 date: { $gte: startOfDay, $lte: endOfDay },
-                status: { $in: ["scheduled", "blocked"] }
+                status: { $in: ["scheduled", "blocked", "completed"] }
             })
         ]);
 

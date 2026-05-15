@@ -43,20 +43,69 @@ export async function POST(req: Request) {
         }
 
         const body = await req.json();
-        const { name, duration, price } = body;
-
-        if (!name || duration === undefined || price === undefined) {
-            return NextResponse.json({ message: "All fields are required" }, { status: 400 });
+        const { name, duration, price, serviceType, packageServiceIds } = body;
+        if (!name) {
+            return NextResponse.json({ message: "Service name is required" }, { status: 400 });
         }
+        const normalizedType = serviceType === 'package' ? 'package' : 'single';
 
         await dbConnect();
-        const parsedPrice = parsePriceInput(price);
+        let normalizedPackageIds: string[] = [];
+        let finalDuration: number;
+        let finalPrice: number;
+        let finalPriceMin: number | undefined;
+        let finalPriceMax: number | undefined;
+
+        if (normalizedType === 'package') {
+            const selectedIds = Array.isArray(packageServiceIds) ? packageServiceIds.map(String) : [];
+            normalizedPackageIds = [...new Set(selectedIds.map((id) => id.trim()).filter(Boolean))];
+            if (normalizedPackageIds.length < 2) {
+                return NextResponse.json({ message: "Package must include at least 2 services" }, { status: 400 });
+            }
+
+            const includedServices = await Service.find({
+                _id: { $in: normalizedPackageIds },
+                serviceType: { $ne: 'package' }
+            });
+            if (includedServices.length !== normalizedPackageIds.length) {
+                return NextResponse.json({ message: "Package can include only valid single services" }, { status: 400 });
+            }
+
+            finalDuration = includedServices.reduce((sum, s: any) => sum + (Number(s.duration) || 0), 0);
+            if (!Number.isFinite(finalDuration) || finalDuration <= 0) {
+                return NextResponse.json({ message: "Invalid package duration" }, { status: 400 });
+            }
+
+            const minTotal = includedServices.reduce((sum, s: any) => sum + (Number(s.priceMin ?? s.price) || 0), 0);
+            const maxTotal = includedServices.reduce((sum, s: any) => sum + (Number(s.priceMax ?? s.price) || 0), 0);
+            if (!Number.isFinite(minTotal) || !Number.isFinite(maxTotal) || minTotal < 0 || maxTotal < 0 || minTotal > maxTotal) {
+                return NextResponse.json({ message: "Invalid package pricing" }, { status: 400 });
+            }
+            finalPrice = minTotal;
+            finalPriceMin = minTotal;
+            finalPriceMax = minTotal === maxTotal ? undefined : maxTotal;
+        } else {
+            if (duration === undefined || price === undefined) {
+                return NextResponse.json({ message: "Price and duration are required for single service" }, { status: 400 });
+            }
+            const parsedPrice = parsePriceInput(price);
+            finalDuration = Number(duration);
+            if (!Number.isFinite(finalDuration) || finalDuration <= 0) {
+                return NextResponse.json({ message: "Invalid duration" }, { status: 400 });
+            }
+            finalPrice = parsedPrice.price;
+            finalPriceMin = parsedPrice.priceMin;
+            finalPriceMax = parsedPrice.priceMax;
+        }
+
         const newService = new Service({
-            name,
-            duration,
-            price: parsedPrice.price,
-            priceMin: parsedPrice.priceMin,
-            priceMax: parsedPrice.priceMax,
+            name: String(name).trim(),
+            duration: finalDuration,
+            price: finalPrice,
+            priceMin: finalPriceMin,
+            priceMax: finalPriceMax,
+            serviceType: normalizedType,
+            packageServiceIds: normalizedType === 'package' ? normalizedPackageIds : [],
         });
         await newService.save();
 

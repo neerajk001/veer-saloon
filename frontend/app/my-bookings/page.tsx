@@ -6,6 +6,8 @@ import { useSession, signIn } from 'next-auth/react';
 import axios from 'axios';
 import { formatDuration } from '@/lib/utils';
 
+const CANCELLATION_BUFFER_MINUTES = 15;
+
 interface Booking {
     _id: string;
     customername: string;
@@ -68,6 +70,10 @@ export default function MyBookingsPage() {
     // ── Cancel booking ──────────────────────────────────────────────────────
     const handleCancelConfirm = async () => {
         if (!cancelTarget) return;
+        if (!isCancellationAllowed(cancelTarget.startTime)) {
+            setCancelError('Cancellation window closed. You can cancel only up to 15 minutes before the appointment time.');
+            return;
+        }
         try {
             setCanceling(true);
             setCancelError('');
@@ -106,6 +112,16 @@ export default function MyBookingsPage() {
         } catch {
             return isoString;
         }
+    };
+
+    const getCancellationCutoff = (startTimeIso: string) => {
+        const start = new Date(startTimeIso);
+        return new Date(start.getTime() - CANCELLATION_BUFFER_MINUTES * 60 * 1000);
+    };
+
+    const isCancellationAllowed = (startTimeIso: string) => {
+        const cutoff = getCancellationCutoff(startTimeIso);
+        return !isNaN(cutoff.getTime()) && new Date() <= cutoff;
     };
 
     // ── Render ───────────────────────────────────────────────────────────────
@@ -245,12 +261,24 @@ export default function MyBookingsPage() {
                                                 </div>
                                             </div>
 
+                                            <p className="mt-3 text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                                                Note: Cancellation allowed only up to 15 minutes before start time.
+                                            </p>
+
                                             {/* Cancel button */}
                                             <button
-                                                onClick={() => { setCancelTarget(booking); setCancelError(''); }}
-                                                className="mt-4 w-full py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-500 hover:border-red-500 hover:text-red-500 hover:bg-red-50 transition-all duration-200"
+                                                onClick={() => {
+                                                    if (!isCancellationAllowed(booking.startTime)) return;
+                                                    setCancelTarget(booking);
+                                                    setCancelError('');
+                                                }}
+                                                disabled={!isCancellationAllowed(booking.startTime)}
+                                                className={`mt-4 w-full py-2.5 rounded-xl border text-sm font-semibold transition-all duration-200 ${isCancellationAllowed(booking.startTime)
+                                                    ? 'border-gray-200 text-gray-500 hover:border-red-500 hover:text-red-500 hover:bg-red-50'
+                                                    : 'border-gray-100 text-gray-300 bg-gray-50 cursor-not-allowed'
+                                                    }`}
                                             >
-                                                Cancel Booking
+                                                {isCancellationAllowed(booking.startTime) ? 'Cancel Booking' : 'Cancellation Closed'}
                                             </button>
                                         </div>
                                     </div>

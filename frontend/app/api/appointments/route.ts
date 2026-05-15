@@ -12,8 +12,17 @@ import mongoose from 'mongoose';
 // Indian phone: 10 digits starting with 6-9
 const PHONE_REGEX = /^[6-9]\d{9}$/;
 
+const getUtcDayRange = (dateStr: string) => {
+    const dayStart = new Date(`${dateStr}T00:00:00.000Z`);
+    if (isNaN(dayStart.getTime())) {
+        return null;
+    }
+    const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+    return { dayStart, dayEnd };
+};
+
 export async function POST(req: Request) {
-    const session = await dbConnect(); // In this setup dbConnect returns the mongoose instance
+    await dbConnect();
     const mongoSession = await mongoose.startSession();
     mongoSession.startTransaction();
 
@@ -61,8 +70,12 @@ export async function POST(req: Request) {
             return NextResponse.json({ message: 'Saloon configuration not found' }, { status: 404 });
         }
 
-        const appointmentDate = new Date(date);
-        appointmentDate.setHours(0, 0, 0, 0);
+        const dayRange = getUtcDayRange(String(date));
+        if (!dayRange) {
+            await mongoSession.abortTransaction();
+            return NextResponse.json({ message: 'Invalid date' }, { status: 400 });
+        }
+        const { dayStart, dayEnd } = dayRange;
 
         // --- MAX 2 ACTIVE BOOKINGS PER DAY RULE ---
         const userEmail = nextAuthSession.user?.email;
@@ -70,8 +83,8 @@ export async function POST(req: Request) {
         const activeCount = await Appointment.countDocuments({
             userEmail: { $regex: new RegExp(`^${escapedEmail}$`, 'i') },
             date: {
-                $gte: appointmentDate,
-                $lt: new Date(appointmentDate.getTime() + 24 * 60 * 60 * 1000)
+                $gte: dayStart,
+                $lt: dayEnd
             },
             status: 'scheduled'
         }).session(mongoSession);
@@ -91,12 +104,20 @@ export async function POST(req: Request) {
         }
 
         const start = new Date(startTime);
+        if (isNaN(start.getTime())) {
+            await mongoSession.abortTransaction();
+            return NextResponse.json({ message: 'Invalid start time' }, { status: 400 });
+        }
+        if (start < dayStart || start >= dayEnd) {
+            await mongoSession.abortTransaction();
+            return NextResponse.json({ message: 'Start time does not match selected date' }, { status: 400 });
+        }
         const end = addMinutesToDate(start, totalDuration);
 
         // Ensure no overlapping active appointments for the slot
         const existingAppointments = await Appointment.find({
-            date: new Date(date),
-            status: { $in: ['scheduled', 'blocked'] },
+            date: { $gte: dayStart, $lt: dayEnd },
+            status: { $in: ['scheduled', 'blocked', 'completed'] },
         }).session(mongoSession);
 
         for (const appointment of existingAppointments) {
@@ -113,7 +134,7 @@ export async function POST(req: Request) {
 
         const newAppointment = new Appointment({
             customername: sanitizedName,
-            date: new Date(date),
+            date: dayStart,
             serviceId: serviceIdsList[0], // keep legacy field for compatibility
             serviceIds: serviceIdsList,
             phoneNumber: cleanPhone,
@@ -133,6 +154,13 @@ export async function POST(req: Request) {
 
     } catch (error) {
         await mongoSession.abortTransaction();
+        if ((error as { code?: number }).code === 11000) {
+            return NextResponse.json({
+                message: 'This time slot is already booked',
+                conflict: true,
+                isBlocked: false
+            }, { status: 409 });
+        }
         console.error('Error creating appointment:', error);
         return NextResponse.json({ message: 'Internal server error' }, { status: 500 });
     } finally {

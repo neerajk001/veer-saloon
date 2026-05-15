@@ -54,6 +54,11 @@ appointmentSchema.path('serviceIds').validate(function (value: unknown) {
 // Compound indexes for common query patterns
 appointmentSchema.index({ date: 1, status: 1 });
 appointmentSchema.index({ userEmail: 1, date: 1, status: 1 });
+// Prevent duplicate active bookings at the exact same start time on the same day.
+appointmentSchema.index(
+    { date: 1, startTime: 1 },
+    { unique: true, partialFilterExpression: { status: { $in: ['scheduled', 'blocked'] } } }
+);
 
 const Appointment = mongoose.models.Appointment || mongoose.model('Appointment', appointmentSchema);
 export default Appointment;
