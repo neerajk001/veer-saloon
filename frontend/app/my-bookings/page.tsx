@@ -261,9 +261,20 @@ export default function MyBookingsPage() {
                                                 </div>
                                             </div>
 
-                                            <p className="mt-3 text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-                                                Note: Cancellation allowed only up to 15 minutes before start time.
-                                            </p>
+                                            <div className="mt-3 flex flex-col gap-2">
+                                                <div className="bg-orange-50 border border-orange-100 rounded-xl p-3 text-xs text-orange-800 flex gap-2 items-start">
+                                                    <svg className="w-4 h-4 flex-shrink-0 mt-0.5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                    </svg>
+                                                    <p>
+                                                        <strong>Important:</strong> Please arrive 10 minutes prior to your scheduled time. 
+                                                        Late arrivals will not be accommodated and will require a new booking.
+                                                    </p>
+                                                </div>
+                                                <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                                                    Note: Cancellation allowed only up to 15 minutes before start time.
+                                                </p>
+                                            </div>
 
                                             {/* Cancel button */}
                                             <button

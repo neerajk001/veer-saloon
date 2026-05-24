@@ -140,6 +140,8 @@ export async function GET(req: Request) {
             return true;
         };
 
+        const now = new Date();
+
         const generateSlotsForWindow = (startTime: string, endTime: string) => {
             // Note: date input is assumed to be YYYY-MM-DD
             // Constructing Date with time string directly might be timezone sensitive.
@@ -153,6 +155,12 @@ export async function GET(req: Request) {
             while (true) {
                 const serviceEnd = addMinutesToDate(current, slotDuration);
                 if (serviceEnd > dayEnd) break;
+
+                // --- NEW: Filter out past slots dynamically based on absolute current time ---
+                if (current <= now) {
+                    current = addMinutesToDate(current, SLOT_INTERVAL);
+                    continue;
+                }
 
                 const available = canFitService(current);
 

@@ -112,6 +112,13 @@ export async function POST(req: Request) {
             await mongoSession.abortTransaction();
             return NextResponse.json({ message: 'Start time does not match selected date' }, { status: 400 });
         }
+        
+        // --- Prevent booking expired/past slots dynamically ---
+        if (start <= new Date()) {
+            await mongoSession.abortTransaction();
+            return NextResponse.json({ message: 'Cannot book past time slots' }, { status: 400 });
+        }
+        
         const end = addMinutesToDate(start, totalDuration);
 
         // Ensure no overlapping active appointments for the slot
