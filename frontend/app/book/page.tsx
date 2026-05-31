@@ -51,6 +51,20 @@ export default function BookingPage() {
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [details, setDetails] = useState({ name: "", phone: "" });
 
+  // Auto-fill returning customer info from localStorage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('veer_salon_user');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setDetails((prev) => ({
+          name: prev.name || parsed.name || '',
+          phone: prev.phone || parsed.phone || '',
+        }));
+      }
+    } catch {}
+  }, []);
+
   const totalDuration = selectedServices.reduce((sum, s) => sum + (Number(s.duration) || 0), 0);
 
   const getServicePriceLabel = (service: Service): string => {
@@ -274,7 +288,13 @@ export default function BookingPage() {
         startTime: selectedSlot,
       });
 
-
+      // Save user info for auto-fill on next visit
+      try {
+        localStorage.setItem('veer_salon_user', JSON.stringify({
+          name: details.name.trim(),
+          phone: details.phone.trim(),
+        }));
+      } catch {}
 
       setSuccess(true);
       setTimeout(() => {

@@ -156,7 +156,7 @@ interface User {
 
 export default function AdminPage() {
   const { data: session } = useSession();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'services' | 'appointments' | 'settings' | 'blocked' | 'users'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'services' | 'appointments' | 'reports' | 'settings' | 'blocked' | 'users'>('dashboard');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -213,6 +213,10 @@ export default function AdminPage() {
   // Users State
   const [users, setUsers] = useState<User[]>([]);
 
+  // Reports State
+  const [reports, setReports] = useState<any[]>([]);
+  const [generatingReport, setGeneratingReport] = useState(false);
+
   // Daily count (backend total for "how many came in a day")
   const [dailyCount, setDailyCount] = useState<{ date: string; total: number; scheduled: number; completed: number } | null>(null);
   // Monthly count (month-end sum from backend)
@@ -260,6 +264,7 @@ export default function AdminPage() {
     }
     if (activeTab === 'services') fetchServices();
     if (activeTab === 'appointments') fetchAppointments();
+    if (activeTab === 'reports') fetchReports();
     if (activeTab === 'settings') fetchConfig();
     if (activeTab === 'blocked') {
       fetchBlockedSlots();
@@ -741,6 +746,174 @@ export default function AdminPage() {
     }
   };
 
+  // ===== REPORTS =====
+  const MONTH_NAMES = ['', 'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'];
+
+  const fetchReports = async () => {
+    try {
+      setLoading(true);
+      const res = await axios.get(`${API_URL}/admin/reports`);
+      setReports(res.data || []);
+    } catch (error) {
+      console.error('Error fetching reports:', error);
+      setReports([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const generateReport = async () => {
+    if (!window.confirm('Generate the monthly report? This will also archive and remove old booking records for that month. This action cannot be undone.')) return;
+    try {
+      setGeneratingReport(true);
+      const res = await axios.post(`${API_URL}/admin/reports`);
+      showMessage('success', res.data.message || 'Report generated successfully');
+      fetchReports();
+    } catch (error: any) {
+      const msg = error.response?.data?.message || 'Failed to generate report';
+      showMessage('error', msg);
+    } finally {
+      setGeneratingReport(false);
+    }
+  };
+
+  const downloadReportPDF = async (report: any) => {
+    try {
+      const { default: jsPDF } = await import('jspdf');
+      const autoTable = (await import('jspdf-autotable')).default;
+
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const monthName = MONTH_NAMES[report.month] || '';
+      const title = `${monthName} ${report.year} — Monthly Report`;
+      let y = 20;
+
+      // Header
+      doc.setFontSize(22);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Veer Salon', pageWidth / 2, y, { align: 'center' });
+      y += 10;
+      doc.setFontSize(13);
+      doc.setFont('helvetica', 'normal');
+      doc.text(title, pageWidth / 2, y, { align: 'center' });
+      y += 6;
+      doc.setFontSize(9);
+      doc.setTextColor(120);
+      const startStr = new Date(report.reportPeriod.startDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+      const endStr = new Date(report.reportPeriod.endDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+      doc.text(`Report Period: ${startStr} – ${endStr}`, pageWidth / 2, y, { align: 'center' });
+      y += 4;
+      doc.text(`Generated: ${new Date(report.generatedAt).toLocaleString('en-IN')}`, pageWidth / 2, y, { align: 'center' });
+      doc.setTextColor(0);
+      y += 8;
+      doc.setDrawColor(200);
+      doc.line(14, y, pageWidth - 14, y);
+      y += 10;
+
+      // Summary table
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Summary', 14, y);
+      y += 6;
+      const s = report.summary;
+      autoTable(doc, {
+        startY: y,
+        head: [['Metric', 'Value']],
+        body: [
+          ['Total Bookings', String(s.totalBookings)],
+          ['Completed', String(s.completedBookings)],
+          ['Cancelled', String(s.cancelledBookings)],
+          ['Cancellation Rate', `${s.cancellationRate}%`],
+          ['Unique Customers', String(s.totalCustomers)],
+          ['Estimated Revenue', `₹${s.estimatedRevenue.toLocaleString('en-IN')}`],
+        ],
+        theme: 'striped',
+        headStyles: { fillColor: [30, 30, 30] },
+        margin: { left: 14, right: 14 },
+      });
+      y = (doc as any).lastAutoTable.finalY + 12;
+
+      // Service Breakdown
+      if (report.serviceBreakdown?.length) {
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Service Breakdown', 14, y);
+        y += 6;
+        autoTable(doc, {
+          startY: y,
+          head: [['Service', 'Bookings', 'Revenue']],
+          body: report.serviceBreakdown.map((sb: any) => [
+            sb.serviceName,
+            String(sb.bookingCount),
+            `₹${sb.estimatedRevenue.toLocaleString('en-IN')}`,
+          ]),
+          theme: 'striped',
+          headStyles: { fillColor: [30, 30, 30] },
+          margin: { left: 14, right: 14 },
+        });
+        y = (doc as any).lastAutoTable.finalY + 12;
+      }
+
+      // Daily Trends
+      if (report.dailyTrends?.length) {
+        if (y > 240) { doc.addPage(); y = 20; }
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Daily Booking Trends', 14, y);
+        y += 6;
+        autoTable(doc, {
+          startY: y,
+          head: [['Date', 'Bookings', 'Completed', 'Cancelled']],
+          body: report.dailyTrends.map((dt: any) => [
+            new Date(dt.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }),
+            String(dt.bookingCount),
+            String(dt.completedCount),
+            String(dt.cancelledCount),
+          ]),
+          theme: 'striped',
+          headStyles: { fillColor: [30, 30, 30] },
+          margin: { left: 14, right: 14 },
+          styles: { fontSize: 9 },
+        });
+      }
+
+      // Footer
+      const pageCount = doc.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(150);
+        doc.text(`Veer Salon — ${title}  |  Page ${i} of ${pageCount}`, pageWidth / 2, doc.internal.pageSize.getHeight() - 10, { align: 'center' });
+      }
+
+      doc.save(`Veer_Salon_${monthName}_${report.year}_Report.pdf`);
+      showMessage('success', 'PDF downloaded successfully');
+    } catch (error) {
+      console.error('PDF generation error:', error);
+      showMessage('error', 'Failed to generate PDF');
+    }
+  };
+
+  // Check if Generate button should be enabled
+  const getReportButtonState = () => {
+    const now = new Date();
+    const prevMonth = now.getUTCMonth(); // 0-indexed (current month - 1 = prev month in 0-indexed)
+    const prevYear = prevMonth === 0 ? now.getUTCFullYear() - 1 : now.getUTCFullYear();
+    const prevMonthNum = prevMonth === 0 ? 12 : prevMonth; // 1-indexed
+
+    const alreadyGenerated = reports.some(r => r.year === prevYear && r.month === prevMonthNum);
+    const isFirstOfMonth = now.getDate() >= 1; // Always true, but keeping for clarity
+
+    return {
+      enabled: isFirstOfMonth && !alreadyGenerated,
+      targetMonth: MONTH_NAMES[prevMonthNum],
+      targetYear: prevYear,
+      targetMonthNum: prevMonthNum,
+      alreadyGenerated,
+    };
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'scheduled':
@@ -847,7 +1020,7 @@ export default function AdminPage() {
             {(() => {
               const isAdmin = (session?.user as any)?.role === 'admin' || isAdminEmail(session?.user?.email);
 
-              const tabs = ['dashboard', 'services', 'appointments', 'settings', 'blocked'];
+              const tabs = ['dashboard', 'services', 'appointments', 'reports', 'settings', 'blocked'];
               if (isAdmin) tabs.push('users');
 
               return tabs.map((tab) => (
@@ -859,7 +1032,7 @@ export default function AdminPage() {
                     : 'bg-gray-50 text-gray-600 hover:bg-gray-100 hover:text-gray-900 border border-gray-200'
                     }`}
                 >
-                  {tab === 'blocked' ? 'Shop Closures' : tab}
+                  {tab === 'blocked' ? 'Shop Closures' : tab === 'reports' ? 'Reports' : tab}
                 </button>
               ));
             })()}
@@ -1482,6 +1655,173 @@ export default function AdminPage() {
             </div>
           </div>
         )}
+
+        {/* Reports */}
+        {activeTab === 'reports' && (() => {
+          const btnState = getReportButtonState();
+          return (
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">Monthly Reports & Analytics</h2>
+
+            {/* Generate Report Button */}
+            <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100 mb-6 max-w-3xl">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Generate Monthly Report</h3>
+                  {btnState.alreadyGenerated ? (
+                    <p className="text-sm text-green-600 mt-1 flex items-center gap-1">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                      {btnState.targetMonth} {btnState.targetYear} report has been generated
+                    </p>
+                  ) : (
+                    <p className="text-sm text-gray-500 mt-1">
+                      Ready to generate <strong>{btnState.targetMonth} {btnState.targetYear}</strong> report
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={generateReport}
+                  disabled={!btnState.enabled || generatingReport}
+                  className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm transition-all ${btnState.enabled && !generatingReport
+                    ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg hover:shadow-xl active:scale-95'
+                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  }`}
+                >
+                  {generatingReport ? (
+                    <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Generating...</>
+                  ) : (
+                    <><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg> Generate {btnState.targetMonth} Report</>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Reports List */}
+            {loading ? (
+              <div className="p-12 text-center text-gray-500">Loading reports...</div>
+            ) : reports.length === 0 ? (
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-12 text-center max-w-3xl">
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                </div>
+                <p className="text-gray-500 font-medium">No reports generated yet</p>
+                <p className="text-gray-400 text-sm mt-1">Click the Generate button above to create your first monthly report.</p>
+              </div>
+            ) : (
+              <div className="space-y-6 max-w-5xl">
+                {reports.map((report) => {
+                  const monthName = MONTH_NAMES[report.month] || '';
+                  const s = report.summary || {};
+                  return (
+                    <div key={report._id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                      {/* Report Header */}
+                      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                        <div>
+                          <h3 className="text-lg font-bold text-white">{monthName} {report.year}</h3>
+                          <p className="text-blue-100 text-xs mt-0.5">
+                            Generated {new Date(report.generatedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                            {report.bookingsCleanedUp && ' · Bookings archived'}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => downloadReportPDF(report)}
+                          className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-lg text-sm font-semibold transition-colors backdrop-blur-sm"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                          Download PDF
+                        </button>
+                      </div>
+
+                      {/* Summary Cards */}
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 p-6">
+                        <div className="bg-blue-50 rounded-xl p-4 text-center">
+                          <div className="text-2xl font-black text-blue-700">{s.totalBookings || 0}</div>
+                          <div className="text-xs font-semibold text-blue-500 uppercase tracking-wide mt-1">Total Bookings</div>
+                        </div>
+                        <div className="bg-green-50 rounded-xl p-4 text-center">
+                          <div className="text-2xl font-black text-green-700">{s.completedBookings || 0}</div>
+                          <div className="text-xs font-semibold text-green-500 uppercase tracking-wide mt-1">Completed</div>
+                        </div>
+                        <div className="bg-red-50 rounded-xl p-4 text-center">
+                          <div className="text-2xl font-black text-red-700">{s.cancelledBookings || 0}</div>
+                          <div className="text-xs font-semibold text-red-500 uppercase tracking-wide mt-1">Cancelled</div>
+                        </div>
+                        <div className="bg-amber-50 rounded-xl p-4 text-center">
+                          <div className="text-2xl font-black text-amber-700">{s.cancellationRate || 0}%</div>
+                          <div className="text-xs font-semibold text-amber-500 uppercase tracking-wide mt-1">Cancel Rate</div>
+                        </div>
+                        <div className="bg-purple-50 rounded-xl p-4 text-center">
+                          <div className="text-2xl font-black text-purple-700">{s.totalCustomers || 0}</div>
+                          <div className="text-xs font-semibold text-purple-500 uppercase tracking-wide mt-1">Customers</div>
+                        </div>
+                        <div className="bg-emerald-50 rounded-xl p-4 text-center">
+                          <div className="text-2xl font-black text-emerald-700">₹{(s.estimatedRevenue || 0).toLocaleString('en-IN')}</div>
+                          <div className="text-xs font-semibold text-emerald-500 uppercase tracking-wide mt-1">Revenue</div>
+                        </div>
+                      </div>
+
+                      {/* Service Breakdown */}
+                      {report.serviceBreakdown?.length > 0 && (
+                        <div className="px-6 pb-4">
+                          <h4 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">Service Breakdown</h4>
+                          <div className="bg-gray-50 rounded-xl overflow-hidden">
+                            <table className="w-full text-sm">
+                              <thead>
+                                <tr className="border-b border-gray-200">
+                                  <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">Service</th>
+                                  <th className="px-4 py-2.5 text-center text-xs font-semibold text-gray-500 uppercase">Bookings</th>
+                                  <th className="px-4 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase">Revenue</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-100">
+                                {report.serviceBreakdown.map((sb: any, i: number) => (
+                                  <tr key={i} className="hover:bg-gray-100 transition-colors">
+                                    <td className="px-4 py-2.5 font-medium text-gray-900">{sb.serviceName}</td>
+                                    <td className="px-4 py-2.5 text-center text-gray-600">{sb.bookingCount}</td>
+                                    <td className="px-4 py-2.5 text-right font-semibold text-gray-900">₹{sb.estimatedRevenue.toLocaleString('en-IN')}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Daily Trends — simple bar visualization */}
+                      {report.dailyTrends?.length > 0 && (
+                        <div className="px-6 pb-6">
+                          <h4 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">Daily Booking Trends</h4>
+                          <div className="bg-gray-50 rounded-xl p-4 overflow-x-auto">
+                            <div className="flex items-end gap-1 min-w-[400px]" style={{ height: '120px' }}>
+                              {(() => {
+                                const maxBookings = Math.max(...report.dailyTrends.map((d: any) => d.bookingCount), 1);
+                                return report.dailyTrends.map((dt: any, i: number) => {
+                                  const heightPct = (dt.bookingCount / maxBookings) * 100;
+                                  const day = new Date(dt.date).getDate();
+                                  return (
+                                    <div key={i} className="flex-1 flex flex-col items-center justify-end gap-1 min-w-[12px]" title={`${dt.date}: ${dt.bookingCount} bookings`}>
+                                      <div className="text-[9px] font-bold text-gray-500">{dt.bookingCount > 0 ? dt.bookingCount : ''}</div>
+                                      <div
+                                        className={`w-full rounded-t transition-all ${dt.bookingCount > 0 ? 'bg-blue-500' : 'bg-gray-200'}`}
+                                        style={{ height: `${Math.max(heightPct, 4)}%`, minHeight: '2px' }}
+                                      />
+                                      <div className="text-[8px] text-gray-400 font-medium">{day}</div>
+                                    </div>
+                                  );
+                                });
+                              })()}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+          );
+        })()}
 
         {/* Settings */}
         {activeTab === 'settings' && (
