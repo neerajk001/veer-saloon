@@ -54,11 +54,9 @@ appointmentSchema.path('serviceIds').validate(function (value: unknown) {
 // Compound indexes for common query patterns
 appointmentSchema.index({ date: 1, status: 1 });
 appointmentSchema.index({ userEmail: 1, date: 1, status: 1 });
-// Prevent duplicate active bookings at the exact same start time on the same day.
-appointmentSchema.index(
-    { date: 1, startTime: 1 },
-    { unique: true, partialFilterExpression: { status: { $in: ['scheduled', 'blocked'] } } }
-);
+// Compound index optimised for the overlap-check query in the POST handler.
+// The query filters by date + status, then checks startTime < newEnd AND endTime > newStart.
+appointmentSchema.index({ date: 1, status: 1, startTime: 1, endTime: 1 });
 
 const Appointment = mongoose.models.Appointment || mongoose.model('Appointment', appointmentSchema);
 export default Appointment;

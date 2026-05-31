@@ -6,8 +6,7 @@ import dbConnect from '@/lib/mongodb';
 import Appointment from '@/models/Appointment';
 import Service from '@/models/Service';
 import SaloonConfig from '@/models/SaloonConfig';
-import { addMinutesToDate, isOverlapping, escapeRegex } from '@/utils/time.utils';
-import mongoose from 'mongoose';
+import { addMinutesToDate, escapeRegex } from '@/utils/time.utils';
 
 // Indian phone: 10 digits starting with 6-9
 const PHONE_REGEX = /^[6-9]\d{9}$/;
@@ -23,8 +22,6 @@ const getUtcDayRange = (dateStr: string) => {
 
 export async function POST(req: Request) {
     await dbConnect();
-    const mongoSession = await mongoose.startSession();
-    mongoSession.startTransaction();
 
     try {
         const nextAuthSession = await getServerSession(authOptions);
@@ -58,21 +55,18 @@ export async function POST(req: Request) {
             return NextResponse.json({ message: 'Invalid phone number. Must be 10 digits starting with 6-9.' }, { status: 400 });
         }
 
-        const services = await Service.find({ _id: { $in: serviceIdsList } }).session(mongoSession);
+        const services = await Service.find({ _id: { $in: serviceIdsList } });
         if (!services || services.length !== serviceIdsList.length) {
-            await mongoSession.abortTransaction();
             return NextResponse.json({ message: 'Service not found' }, { status: 404 });
         }
 
-        const config = await SaloonConfig.findOne().session(mongoSession);
+        const config = await SaloonConfig.findOne();
         if (!config) {
-            await mongoSession.abortTransaction();
             return NextResponse.json({ message: 'Saloon configuration not found' }, { status: 404 });
         }
 
         const dayRange = getUtcDayRange(String(date));
         if (!dayRange) {
-            await mongoSession.abortTransaction();
             return NextResponse.json({ message: 'Invalid date' }, { status: 400 });
         }
         const { dayStart, dayEnd } = dayRange;
@@ -87,10 +81,9 @@ export async function POST(req: Request) {
                 $lt: dayEnd
             },
             status: 'scheduled'
-        }).session(mongoSession);
+        });
 
         if (activeCount >= 2) {
-            await mongoSession.abortTransaction();
             return NextResponse.json({ 
                 message: 'Limit reached: You can have max 2 active bookings per day.' 
             }, { status: 403 });
@@ -99,46 +92,49 @@ export async function POST(req: Request) {
 
         const totalDuration = services.reduce((sum, s: any) => sum + (Number(s.duration) || 0), 0);
         if (!totalDuration || totalDuration <= 0) {
-            await mongoSession.abortTransaction();
             return NextResponse.json({ message: 'Invalid service duration' }, { status: 400 });
         }
 
         const start = new Date(startTime);
         if (isNaN(start.getTime())) {
-            await mongoSession.abortTransaction();
             return NextResponse.json({ message: 'Invalid start time' }, { status: 400 });
         }
         if (start < dayStart || start >= dayEnd) {
-            await mongoSession.abortTransaction();
             return NextResponse.json({ message: 'Start time does not match selected date' }, { status: 400 });
         }
         
         // --- Prevent booking expired/past slots dynamically ---
         if (start <= new Date()) {
-            await mongoSession.abortTransaction();
             return NextResponse.json({ message: 'Cannot book past time slots' }, { status: 400 });
         }
         
         const end = addMinutesToDate(start, totalDuration);
 
-        // Ensure no overlapping active appointments for the slot
-        const existingAppointments = await Appointment.find({
+        // =====================================================================
+        // OVERLAP CHECK — MongoDB query-level (not an in-memory JS loop).
+        // Two time ranges [A_start, A_end) and [B_start, B_end) overlap iff
+        //   A_start < B_end  AND  A_end > B_start
+        // This runs as a single indexed query against the appointments collection.
+        // =====================================================================
+        const overlapFilter = {
             date: { $gte: dayStart, $lt: dayEnd },
             status: { $in: ['scheduled', 'blocked', 'completed'] },
-        }).session(mongoSession);
+            startTime: { $lt: end },   // existing starts before new ends
+            endTime:   { $gt: start }, // existing ends after new starts
+        };
 
-        for (const appointment of existingAppointments) {
-            if (isOverlapping(appointment.startTime, appointment.endTime, start, end)) {
-                const isBlocked = appointment.status === 'blocked';
-                await mongoSession.abortTransaction();
-                return NextResponse.json({
-                    message: isBlocked ? 'This time slot is blocked by admin' : 'This time slot is already booked',
-                    conflict: true,
-                    isBlocked
-                }, { status: 409 });
-            }
+        const existingConflict = await Appointment.findOne(overlapFilter).lean();
+
+        if (existingConflict) {
+            const isBlocked = (existingConflict as any).status === 'blocked';
+            return NextResponse.json({
+                message: isBlocked ? 'This time slot is blocked by admin' : 'This time slot is already booked',
+                conflict: true,
+                isBlocked
+            }, { status: 409 });
         }
 
+        // --- INSERT the appointment ---
         const newAppointment = new Appointment({
             customername: sanitizedName,
             date: dayStart,
@@ -151,27 +147,48 @@ export async function POST(req: Request) {
             userEmail: userEmail
         });
 
-        await newAppointment.save({ session: mongoSession });
+        await newAppointment.save();
 
-        await mongoSession.commitTransaction();
+        // =====================================================================
+        // POST-INSERT RACE-CONDITION GUARD
+        // On Atlas free tier (M0) there are no multi-document transactions, so
+        // two concurrent requests could both pass the pre-check above and both
+        // insert.  We catch that here: query again for any OTHER active booking
+        // that overlaps our new time range.  If found, the booking with the
+        // earlier ObjectId (created first) wins; the later one rolls itself back.
+        // =====================================================================
+        const racingConflicts = await Appointment.find({
+            ...overlapFilter,
+            _id: { $ne: newAppointment._id },
+        }).select('_id').lean();
+
+        if (racingConflicts.length > 0) {
+            // Determine if we lose the race (our _id is larger = created later)
+            const weCreatedLater = racingConflicts.some(
+                (c: any) => newAppointment._id.toString() > c._id.toString()
+            );
+
+            if (weCreatedLater) {
+                // We lost — roll back our insert
+                await Appointment.findByIdAndDelete(newAppointment._id);
+                return NextResponse.json({
+                    message: 'This time slot was just booked by someone else. Please choose another time.',
+                    conflict: true,
+                    isBlocked: false
+                }, { status: 409 });
+            }
+            // We won the race (our _id is smaller). The other concurrent
+            // request's own post-insert guard will delete its document.
+        }
+
         return NextResponse.json({
             message: 'Appointment created successfully',
             appointment: newAppointment
         }, { status: 201 });
 
     } catch (error) {
-        await mongoSession.abortTransaction();
-        if ((error as { code?: number }).code === 11000) {
-            return NextResponse.json({
-                message: 'This time slot is already booked',
-                conflict: true,
-                isBlocked: false
-            }, { status: 409 });
-        }
         console.error('Error creating appointment:', error);
         return NextResponse.json({ message: 'Internal server error' }, { status: 500 });
-    } finally {
-        await mongoSession.endSession();
     }
 }
 
