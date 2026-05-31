@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongodb';
 import Service from '@/models/Service';
-
-
-
-export const dynamic = 'force-dynamic';
+// Services rarely change — cache for 24 hours to reduce DB calls.
+// The booking page fetches this on every visit, so caching saves significant load.
+export const revalidate = 86400; // 24 hours
 
 
 export async function GET() {

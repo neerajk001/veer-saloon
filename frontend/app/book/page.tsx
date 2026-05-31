@@ -146,7 +146,18 @@ export default function BookingPage() {
         await sleep(700);
         res = await axios.get(`${API_URL}/services/all`);
       }
-      setServices(res.data.services || []);
+      const fetchedServices: Service[] = res.data.services || [];
+      setServices(fetchedServices);
+
+      // Auto-select last picked services for returning customers
+      try {
+        const savedIds = localStorage.getItem('veer_salon_last_services');
+        if (savedIds) {
+          const ids: string[] = JSON.parse(savedIds);
+          const matched = fetchedServices.filter(s => ids.includes(s._id));
+          if (matched.length > 0) setSelectedServices(matched);
+        }
+      } catch {}
     } catch (err) {
       console.error("Failed to fetch services", err);
       setError("Could not load services right now. Please try again in a moment.");
@@ -294,6 +305,10 @@ export default function BookingPage() {
           name: details.name.trim(),
           phone: details.phone.trim(),
         }));
+        // Save last picked services for auto-select on next visit
+        localStorage.setItem('veer_salon_last_services',
+          JSON.stringify(selectedServices.map(s => s._id))
+        );
       } catch {}
 
       setSuccess(true);

@@ -4,7 +4,8 @@ import dbConnect from '@/lib/mongodb';
 import SaloonConfig from '@/models/SaloonConfig';
 
 
-export const revalidate = 3600; // Cache for 1 hour
+// Salon config (shifts, days off) rarely changes — cache for 12 hours.
+export const revalidate = 43200; // 12 hours
 
 export async function GET() {
     try {
