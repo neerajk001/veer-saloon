@@ -176,6 +176,7 @@ export default function AdminPage() {
   // Appointments State
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedAppointmentForModal, setSelectedAppointmentForModal] = useState<Appointment | null>(null);
 
   // Settings State
   const [config, setConfig] = useState<SalonConfig>({
@@ -744,6 +745,26 @@ export default function AdminPage() {
     } catch (e) {
       return dateString;
     }
+  };
+
+  const getWhatsAppLink = (phoneNumber: string, customerName: string, date: string, startTime: string) => {
+    let cleanNum = phoneNumber ? phoneNumber.replace(/\D/g, '') : '';
+    if (cleanNum.length === 10) {
+      cleanNum = '91' + cleanNum;
+    }
+    
+    let formattedDateTime = '';
+    try {
+      const d = new Date(startTime);
+      const dateOptions: Intl.DateTimeFormatOptions = { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' };
+      const timeOptions: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit', hour12: true };
+      formattedDateTime = `${d.toLocaleDateString('en-IN', dateOptions)} at ${d.toLocaleTimeString('en-IN', timeOptions)}`;
+    } catch (e) {
+      formattedDateTime = `${date} at ${startTime}`;
+    }
+
+    const message = `Hello ${customerName || 'Customer'}, regarding your salon appointment on ${formattedDateTime},`;
+    return `https://wa.me/${cleanNum}?text=${encodeURIComponent(message)}`;
   };
 
   // ===== REPORTS =====
@@ -1521,7 +1542,13 @@ export default function AdminPage() {
                           {formatTime(apt.startTime)} - {formatTime(apt.endTime)}
                         </td>
                         <td className="px-6 py-4">
-                          <div className="text-sm font-medium text-gray-900">{apt.customername}</div>
+                          <button
+                            onClick={() => setSelectedAppointmentForModal(apt)}
+                            className="text-sm font-semibold text-blue-600 hover:text-blue-800 hover:underline text-left block"
+                            title="View Booking Details"
+                          >
+                            {apt.customername}
+                          </button>
                           <div className="text-xs text-gray-500">{apt.phoneNumber}</div>
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-600">
@@ -1540,6 +1567,24 @@ export default function AdminPage() {
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex justify-end gap-2">
+                            <button
+                              onClick={() => setSelectedAppointmentForModal(apt)}
+                              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                              title="View Booking Details"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                            </button>
+                            <a
+                              href={getWhatsAppLink(apt.phoneNumber, apt.customername, apt.date, apt.startTime)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-1.5 text-[#25D366] hover:bg-green-50 rounded-lg transition-colors flex items-center justify-center"
+                              title="Contact on WhatsApp"
+                            >
+                              <svg className="w-[18px] h-[18px] fill-current" viewBox="0 0 24 24">
+                                <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.59-4.846c1.6.95 3.488 1.459 5.416 1.46 5.512 0 10.002-4.493 10.005-10.007.001-2.671-1.03-5.182-2.903-7.057C17.29 1.673 14.78 1.04 12.11 1.04c-5.522 0-10.012 4.493-10.015 10.008-.001 1.914.501 3.784 1.455 5.397L2.457 21.05l4.19-1.096zm12.367-7.102c-.329-.165-1.952-.963-2.253-1.073-.302-.11-.522-.165-.742.165-.22.33-.85 1.073-1.042 1.293-.193.22-.386.248-.715.083-.329-.165-1.39-.512-2.648-1.633-.978-.872-1.637-1.95-1.829-2.28-.193-.33-.021-.508.144-.673.148-.148.33-.385.495-.578.165-.192.22-.33.33-.55.11-.22.055-.413-.028-.578-.083-.165-.742-1.79-.1017-2.395-.26-.628-.577-.54-.788-.541-.2-.001-.429-.001-.66-.001-.229 0-.605.086-.921.433-.317.347-1.21 1.184-1.21 2.887 0 1.702 1.237 3.348 1.41 3.582.173.234 2.433 3.715 5.892 5.21 1.157.502 2.057.81 2.756 1.03.864.275 1.652.236 2.274.143.693-.104 1.952-.798 2.227-1.57.275-.77.275-1.43.193-1.57-.083-.14-.302-.22-.63-.385z" />
+                              </svg>
+                            </a>
                             {apt.status === 'scheduled' && (
                               <>
                                 <button
@@ -1599,6 +1644,17 @@ export default function AdminPage() {
                           >
                             {apt.status}
                           </span>
+                          <a
+                            href={getWhatsAppLink(apt.phoneNumber, apt.customername, apt.date, apt.startTime)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-1.5 text-[#25D366] bg-green-50 hover:bg-green-100 rounded-lg transition-colors flex items-center justify-center"
+                            title="Contact on WhatsApp"
+                          >
+                            <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+                              <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.59-4.846c1.6.95 3.488 1.459 5.416 1.46 5.512 0 10.002-4.493 10.005-10.007.001-2.671-1.03-5.182-2.903-7.057C17.29 1.673 14.78 1.04 12.11 1.04c-5.522 0-10.012 4.493-10.015 10.008-.001 1.914.501 3.784 1.455 5.397L2.457 21.05l4.19-1.096zm12.367-7.102c-.329-.165-1.952-.963-2.253-1.073-.302-.11-.522-.165-.742.165-.22.33-.85 1.073-1.042 1.293-.193.22-.386.248-.715.083-.329-.165-1.39-.512-2.648-1.633-.978-.872-1.637-1.95-1.829-2.28-.193-.33-.021-.508.144-.673.148-.148.33-.385.495-.578.165-.192.22-.33.33-.55.11-.22.055-.413-.028-.578-.083-.165-.742-1.79-.1017-2.395-.26-.628-.577-.54-.788-.541-.2-.001-.429-.001-.66-.001-.229 0-.605.086-.921.433-.317.347-1.21 1.184-1.21 2.887 0 1.702 1.237 3.348 1.41 3.582.173.234 2.433 3.715 5.892 5.21 1.157.502 2.057.81 2.756 1.03.864.275 1.652.236 2.274.143.693-.104 1.952-.798 2.227-1.57.275-.77.275-1.43.193-1.57-.083-.14-.302-.22-.63-.385z" />
+                            </svg>
+                          </a>
                           <button
                             onClick={() => deleteAppointment(apt._id)}
                             className="p-1.5 text-red-500 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
@@ -1616,7 +1672,13 @@ export default function AdminPage() {
                           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
                         </div>
                         <div>
-                          <div className="text-sm font-semibold text-gray-900">{apt.customername}</div>
+                          <button
+                            onClick={() => setSelectedAppointmentForModal(apt)}
+                            className="text-sm font-semibold text-blue-600 hover:text-blue-800 hover:underline text-left block"
+                            title="View Booking Details"
+                          >
+                            {apt.customername}
+                          </button>
                           <div className="text-xs text-gray-500">{apt.phoneNumber}</div>
                         </div>
                       </div>
@@ -2262,6 +2324,172 @@ export default function AdminPage() {
           </div>
         )}
       </main>
+
+      {/* Booking Details Modal */}
+      {selectedAppointmentForModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl border border-gray-100 flex flex-col animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">Booking Details</h3>
+                <p className="text-xs text-gray-500 font-mono mt-0.5">ID: {selectedAppointmentForModal._id}</p>
+              </div>
+              <button
+                onClick={() => setSelectedAppointmentForModal(null)}
+                className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 space-y-6 overflow-y-auto max-h-[60vh]">
+              {/* Customer Information */}
+              <div>
+                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Customer Details</h4>
+                <div className="flex items-start gap-3 bg-gray-50 p-4 rounded-xl border border-gray-100">
+                  <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-sm flex-shrink-0">
+                    {selectedAppointmentForModal.customername?.charAt(0).toUpperCase() || 'C'}
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold text-gray-900">{selectedAppointmentForModal.customername}</div>
+                    <div className="text-sm text-gray-600 mt-0.5">{selectedAppointmentForModal.phoneNumber}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Appointment Date & Time */}
+              <div>
+                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Date & Time</h4>
+                <div className="flex items-start gap-3 bg-gray-50 p-4 rounded-xl border border-gray-100">
+                  <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600 flex-shrink-0">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold text-gray-900">
+                      {(() => {
+                        try {
+                          return new Date(selectedAppointmentForModal.startTime).toLocaleDateString('en-IN', {
+                            weekday: 'long',
+                            day: '2-digit',
+                            month: 'long',
+                            year: 'numeric'
+                          });
+                        } catch (e) {
+                          return selectedAppointmentForModal.date;
+                        }
+                      })()}
+                    </div>
+                    <div className="text-sm text-gray-600 mt-0.5">
+                      {formatTime(selectedAppointmentForModal.startTime)} - {formatTime(selectedAppointmentForModal.endTime)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Services */}
+              <div>
+                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Services Requested</h4>
+                <div className="border border-gray-100 rounded-xl overflow-hidden divide-y divide-gray-100">
+                  {(() => {
+                    const servicesList = selectedAppointmentForModal.serviceIds?.length
+                      ? selectedAppointmentForModal.serviceIds
+                      : selectedAppointmentForModal.serviceId
+                        ? [selectedAppointmentForModal.serviceId]
+                        : [];
+
+                    if (servicesList.length === 0) {
+                      return <div className="p-4 text-sm text-gray-500 text-center">No services info available</div>;
+                    }
+
+                    return servicesList.map((svc: any) => (
+                      <div key={svc._id} className="p-4 flex justify-between items-center hover:bg-gray-50/50">
+                        <div>
+                          <div className="text-sm font-semibold text-gray-900">{svc.name}</div>
+                          <div className="text-xs text-gray-500 mt-0.5">{formatDuration(svc.duration)}</div>
+                        </div>
+                        <div className="text-sm font-semibold text-blue-600">
+                          {svc.price ? `₹${svc.price}` : svc.priceMin ? `₹${svc.priceMin} - ₹${svc.priceMax}` : 'N/A'}
+                        </div>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              </div>
+
+              {/* Status */}
+              <div className="flex items-center justify-between border-t border-gray-100 pt-4">
+                <span className="text-sm font-medium text-gray-500">Status</span>
+                <span className={`px-3 py-1 inline-flex text-xs font-semibold rounded-full ${getStatusColor(selectedAppointmentForModal.status)}`}>
+                  {selectedAppointmentForModal.status}
+                </span>
+              </div>
+            </div>
+
+            {/* Modal Footer Actions */}
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex flex-col gap-3">
+              {/* WhatsApp Button */}
+              <a
+                href={getWhatsAppLink(
+                  selectedAppointmentForModal.phoneNumber,
+                  selectedAppointmentForModal.customername,
+                  selectedAppointmentForModal.date,
+                  selectedAppointmentForModal.startTime
+                )}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex w-full items-center justify-center gap-2 py-3 px-4 bg-[#25D366] hover:bg-[#20ba56] text-white font-bold rounded-xl shadow-md hover:shadow-lg active:scale-[0.98] transition-all text-center animate-pulse hover:animate-none"
+              >
+                <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
+                  <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.59-4.846c1.6.95 3.488 1.459 5.416 1.46 5.512 0 10.002-4.493 10.005-10.007.001-2.671-1.03-5.182-2.903-7.057C17.29 1.673 14.78 1.04 12.11 1.04c-5.522 0-10.012 4.493-10.015 10.008-.001 1.914.501 3.784 1.455 5.397L2.457 21.05l4.19-1.096zm12.367-7.102c-.329-.165-1.952-.963-2.253-1.073-.302-.11-.522-.165-.742.165-.22.33-.85 1.073-1.042 1.293-.193.22-.386.248-.715.083-.329-.165-1.39-.512-2.648-1.633-.978-.872-1.637-1.95-1.829-2.28-.193-.33-.021-.508.144-.673.148-.148.33-.385.495-.578.165-.192.22-.33.33-.55.11-.22.055-.413-.028-.578-.083-.165-.742-1.79-.1017-2.395-.26-.628-.577-.54-.788-.541-.2-.001-.429-.001-.66-.001-.229 0-.605.086-.921.433-.317.347-1.21 1.184-1.21 2.887 0 1.702 1.237 3.348 1.41 3.582.173.234 2.433 3.715 5.892 5.21 1.157.502 2.057.81 2.756 1.03.864.275 1.652.236 2.274.143.693-.104 1.952-.798 2.227-1.57.275-.77.275-1.43.193-1.57-.083-.14-.302-.22-.63-.385z" />
+                </svg>
+                Contact on WhatsApp
+              </a>
+
+              <div className="flex gap-2">
+                {/* Action Button: Done / Complete */}
+                {selectedAppointmentForModal.status === 'scheduled' && (
+                  <button
+                    onClick={async () => {
+                      await updateAppointmentStatus(selectedAppointmentForModal._id, 'completed');
+                      setSelectedAppointmentForModal(prev => prev ? ({ ...prev, status: 'completed' }) : prev);
+                    }}
+                    className="flex-1 py-2.5 px-4 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition-colors text-sm"
+                  >
+                    Mark Done
+                  </button>
+                )}
+
+                {/* Action Button: Cancel */}
+                {selectedAppointmentForModal.status === 'scheduled' && (
+                  <button
+                    onClick={async () => {
+                      await updateAppointmentStatus(selectedAppointmentForModal._id, 'canceled');
+                      setSelectedAppointmentForModal(prev => prev ? ({ ...prev, status: 'canceled' }) : prev);
+                    }}
+                    className="flex-1 py-2.5 px-4 bg-orange-600 hover:bg-orange-700 text-white font-semibold rounded-xl transition-colors text-sm"
+                  >
+                    Cancel Booking
+                  </button>
+                )}
+
+                {/* Close Button */}
+                <button
+                  onClick={() => setSelectedAppointmentForModal(null)}
+                  className="flex-1 py-2.5 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl transition-colors text-sm"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
