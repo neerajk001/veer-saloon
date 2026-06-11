@@ -48,9 +48,10 @@ export default function MyBookingsPage() {
             setLoading(true);
             setError('');
             const res = await axios.get(`/api/appointments?userEmail=${encodeURIComponent(session.user.email)}`);
-            // Only show future/today bookings
-            const now = new Date();
-            const upcoming = (res.data as Booking[]).filter(b => new Date(b.startTime) > now);
+            // Only show bookings that are scheduled for today (start of day) or in the future
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const upcoming = (res.data as Booking[]).filter(b => new Date(b.startTime) >= today);
             setBookings(upcoming);
         } catch (err: any) {
             setError('Could not load your bookings. Please try again.');
